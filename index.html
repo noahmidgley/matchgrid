@@ -1,0 +1,1828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Matchgrid — Aldmere Arena</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   THEME TOKENS
+   ===================================================================== */
+:root{
+  --bg:#04070d; --panel:rgba(8,14,24,.86); --panel-2:rgba(14,22,36,.9);
+  --line:rgba(46,242,255,.14); --line-strong:rgba(46,242,255,.42);
+  --text:#d8e6f3; --muted:#6d8197; --dim:#3d4d60;
+  --cyan:#2ef2ff; --magenta:#ff3d9a; --lime:#7dff6a; --amber:#ffbe3b;
+  --orange:#ff8a3d; --red:#ff4d5e; --blue:#5b8cff; --green:#3dff8c;
+  --mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+  --sans:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13px;-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+#scene{position:fixed;inset:0}
+#scene canvas{display:block}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.cap{font-size:9.5px;letter-spacing:.16em;color:var(--muted);text-transform:uppercase;font-weight:700}
+
+/* =====================================================================
+   TOP BAR
+   ===================================================================== */
+#topbar{position:fixed;top:10px;left:10px;right:10px;height:60px;display:flex;align-items:center;padding:0 8px 0 14px;z-index:20;gap:0}
+.brand{display:flex;align-items:center;gap:10px;padding-right:16px;min-width:max-content}
+.brand .logo{width:26px;height:26px;border:2px solid var(--cyan);transform:rotate(45deg);display:grid;place-items:center;box-shadow:0 0 14px rgba(46,242,255,.45)}
+.brand .logo i{width:8px;height:8px;background:var(--cyan);display:block}
+.brand b{font-weight:800;letter-spacing:.2em;font-size:14px}
+.brand small{display:block;font-size:9.5px;color:var(--muted);letter-spacing:.18em;margin-top:2px}
+.tb{display:flex;flex-direction:column;justify-content:center;padding:0 16px;height:40px;border-left:1px solid var(--line);min-width:max-content}
+.tb .v{font-size:17px;font-weight:700;margin-top:3px}
+#phase{color:var(--cyan)}
+.clock-row{display:flex;align-items:baseline;gap:10px}
+#clock{font-size:22px;font-weight:700;color:#fff;text-shadow:0 0 12px rgba(46,242,255,.5)}
+#wall{color:var(--muted);font-size:11px}
+.score{flex-direction:row;align-items:center;gap:10px}
+.score .team{font-weight:800;font-size:12px;letter-spacing:.12em;padding:3px 7px;border-radius:4px}
+.team.home{color:var(--cyan);background:rgba(46,242,255,.1);border:1px solid rgba(46,242,255,.35)}
+.team.away{color:var(--magenta);background:rgba(255,61,154,.1);border:1px solid rgba(255,61,154,.35)}
+#score{font-size:22px;font-weight:700}
+.safety .row{display:flex;align-items:center;gap:8px;margin-top:4px}
+.meter{width:110px;height:7px;background:rgba(255,255,255,.07);border-radius:4px;overflow:hidden}
+.meter i{display:block;height:100%;width:100%;background:var(--lime);transition:width .4s,background .4s;box-shadow:0 0 10px currentColor}
+#safetyVal{font-size:15px;font-weight:700;width:30px}
+#safetyGrade{font-size:10px;font-weight:800;letter-spacing:.14em;padding:2px 6px;border-radius:3px}
+.spacer{flex:1}
+.ctrls{display:flex;gap:5px;align-items:center;padding-left:14px;border-left:1px solid var(--line);height:40px}
+.btn{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:6px;padding:7px 10px;font-weight:700;font-size:11.5px;letter-spacing:.06em;transition:all .15s}
+.btn:hover{border-color:var(--line-strong);background:rgba(46,242,255,.08)}
+.btn.on{background:rgba(46,242,255,.16);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(46,242,255,.25) inset}
+.btn.heat.on{background:rgba(255,138,61,.16);border-color:var(--orange);color:var(--orange);box-shadow:0 0 12px rgba(255,138,61,.25) inset}
+#pauseBtn{min-width:38px}
+
+/* =====================================================================
+   SIDE PANEL (KPIs, gates, kiosks, units)
+   ===================================================================== */
+#side{position:fixed;top:80px;right:10px;bottom:10px;width:318px;z-index:15;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:14px}
+#side::-webkit-scrollbar{width:6px}#side::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+.sec-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+.kpi .v{font-size:19px;font-weight:700;margin-top:4px;transition:color .3s}
+.kpi .s{font-size:10.5px;color:var(--muted);margin-top:2px}
+.bars{display:flex;flex-direction:column;gap:5px}
+.bar-row{display:grid;grid-template-columns:52px 1fr 64px;align-items:center;gap:8px;font-size:11.5px}
+.bar-row .lbl{color:var(--muted);font-weight:600}
+.bar-row .val{text-align:right;font-size:11px}
+.bar{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.bar i{display:block;height:100%;width:0;border-radius:3px;transition:width .35s,background .35s}
+.kbars{display:grid;grid-template-columns:1fr 1fr;gap:5px 12px}
+.kbars .bar-row{grid-template-columns:22px 1fr 22px}
+#spark{width:100%;height:42px;display:block}
+.roster{display:flex;flex-direction:column;gap:3px}
+.unit-row{display:grid;grid-template-columns:10px 46px 1fr;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;border:1px solid transparent;cursor:pointer;transition:background .15s,border-color .15s}
+.unit-row:hover{background:rgba(255,255,255,.04)}
+.unit-row.sel{border-color:var(--line-strong);background:rgba(46,242,255,.07)}
+.unit-row .dot{width:9px;height:9px;border-radius:50%;box-shadow:0 0 8px currentColor;background:currentColor}
+.unit-row b{font-family:var(--mono);font-size:11.5px}
+.unit-row span{color:var(--muted);font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.unit-row span.busy{color:var(--text)}
+#unitCard{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px;min-height:64px}
+#unitCard.empty{color:var(--muted);font-size:12px;display:grid;place-items:center;text-align:center}
+.uc-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.uc-badge{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:11px;border:1px solid currentColor;box-shadow:0 0 14px -4px currentColor}
+.uc-head b{font-size:15px;font-family:var(--mono)}
+.uc-head small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.uc-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11.5px}
+.uc-grid dt{color:var(--muted)}
+.uc-actions{display:flex;gap:6px;margin-top:10px}
+.uc-actions .btn{flex:1;padding:6px}
+
+/* =====================================================================
+   EVENT LOG
+   ===================================================================== */
+#log{position:fixed;left:10px;bottom:10px;width:410px;height:220px;z-index:15;display:flex;flex-direction:column;padding:10px 12px}
+#logList{list-style:none;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;margin-top:6px}
+#logList::-webkit-scrollbar{width:5px}#logList::-webkit-scrollbar-thumb{background:var(--dim);border-radius:3px}
+#logList li{display:grid;grid-template-columns:44px 1fr;gap:8px;font-size:11.5px;line-height:1.45;padding:2px 4px;border-left:2px solid var(--dim);animation:slideIn .35s ease-out}
+#logList li time{font-family:var(--mono);color:var(--muted);font-size:10.5px}
+#logList li.warn{border-color:var(--amber)} #logList li.warn span{color:#ffe0a0}
+#logList li.crit{border-color:var(--red);background:rgba(255,77,94,.07)} #logList li.crit span{color:#ffb3bb}
+#logList li.good{border-color:var(--lime)} #logList li.good span{color:#c9ffc0}
+#logList li.goal{border-color:var(--cyan);background:rgba(46,242,255,.07)} #logList li.goal span{color:#fff;font-weight:700}
+@keyframes slideIn{from{opacity:0;transform:translateX(-8px)}to{opacity:1;transform:none}}
+
+/* =====================================================================
+   CAMERA PRESETS + HELP
+   ===================================================================== */
+#cams{position:fixed;top:80px;left:10px;z-index:15;display:flex;gap:5px;padding:6px;flex-wrap:wrap;max-width:calc(100vw - 350px)}
+#cams .cap{align-self:center;padding:0 6px}
+#help{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:12;font-size:11px;color:var(--muted);padding:7px 12px;white-space:nowrap}
+#help kbd{font-family:var(--mono);font-size:10px;border:1px solid var(--dim);border-radius:3px;padding:0 4px;color:var(--text)}
+#heatLegend{position:fixed;top:128px;left:10px;z-index:15;padding:8px 10px;display:none;width:180px}
+#heatLegend.show{display:block}
+#heatLegend .grad{height:8px;border-radius:4px;margin:6px 0 3px;background:linear-gradient(90deg,rgba(30,80,255,.3),#1e50ff,#00f0ff,#ffe600,#ff283c)}
+#heatLegend .ends{display:flex;justify-content:space-between;font-size:10px;color:var(--muted)}
+
+/* =====================================================================
+   WORLD-SPACE LABELS (projected each frame)
+   ===================================================================== */
+#labels{position:fixed;inset:0;pointer-events:none;z-index:10;overflow:hidden}
+.ulabel{position:absolute;left:0;top:0;font-family:var(--mono);font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(4,8,14,.75);border:1px solid currentColor;white-space:nowrap;will-change:transform;opacity:.9}
+.ulabel.sel{background:currentColor}
+.ulabel.sel em{color:#04070d}
+.ulabel em{font-style:normal}
+.ilabel{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;min-width:138px;padding:6px 8px;border-radius:7px;background:rgba(10,8,12,.88);border:1px solid var(--amber);will-change:transform;box-shadow:0 0 18px -6px var(--amber);transition:border-color .3s,box-shadow .3s}
+.ilabel:hover{filter:brightness(1.25)}
+.ilabel .t{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700}
+.ilabel .code{font-family:var(--mono);font-size:9.5px;padding:1px 4px;border-radius:3px;background:var(--amber);color:#120a00}
+.ilabel .z{color:var(--muted);font-weight:500;font-size:10.5px}
+.ilabel .sev{height:4px;background:rgba(255,255,255,.08);border-radius:2px;margin-top:5px;overflow:hidden}
+.ilabel .sev i{display:block;height:100%;background:var(--amber);transition:width .25s}
+.ilabel .need{font-size:9.5px;color:var(--muted);margin-top:4px;letter-spacing:.06em}
+.ilabel.crit{border-color:var(--red);box-shadow:0 0 22px -4px var(--red);animation:blink 1s infinite}
+.ilabel.crit .code,.ilabel.crit .sev i{background:var(--red)}
+.ilabel.work{border-color:var(--lime);box-shadow:0 0 18px -6px var(--lime);animation:none}
+.ilabel.work .sev i{background:var(--lime)}
+.ilabel::after{content:'';position:absolute;left:50%;bottom:-6px;width:1px;height:6px;background:inherit;border-left:1px solid var(--amber)}
+@keyframes blink{50%{box-shadow:0 0 4px -2px var(--red)}}
+
+/* =====================================================================
+   BANNER + OVERLAYS
+   ===================================================================== */
+#banner{position:fixed;top:24%;left:50%;transform:translate(-50%,-50%) scale(.9);z-index:30;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s,transform .35s}
+#banner.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+#banner h1{font-size:54px;font-weight:800;letter-spacing:.14em;color:#fff;text-shadow:0 0 30px var(--bc,var(--cyan)),0 0 2px var(--bc,var(--cyan))}
+#banner p{font-size:13px;letter-spacing:.3em;color:var(--bc,var(--cyan));margin-top:6px;font-weight:700}
+.overlay{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:radial-gradient(ellipse at center,rgba(4,7,13,.55),rgba(4,7,13,.92));transition:opacity .5s}
+.overlay.hidden{opacity:0;pointer-events:none}
+.ov-card{width:min(560px,calc(100vw - 32px));padding:30px;border-radius:14px;background:rgba(8,14,24,.94);border:1px solid var(--line-strong);box-shadow:0 0 60px -20px var(--cyan)}
+.ov-card h1{font-size:30px;letter-spacing:.22em;font-weight:800}
+.ov-card h1 span{color:var(--cyan)}
+.ov-card .sub{color:var(--muted);letter-spacing:.16em;font-size:11px;margin-top:4px;font-weight:600}
+.ov-card p{margin-top:16px;line-height:1.6;color:#b6c6d8}
+.ov-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:16px}
+.ov-grid div{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px;font-size:12px;line-height:1.5}
+.ov-grid b{display:block;margin-bottom:3px}
+.cta{margin-top:20px;width:100%;padding:13px;font-size:13px;font-weight:800;letter-spacing:.2em;border-radius:8px;border:1px solid var(--cyan);background:rgba(46,242,255,.12);color:var(--cyan);box-shadow:0 0 24px -6px var(--cyan);transition:all .2s}
+.cta:hover{background:rgba(46,242,255,.22)}
+.grade{font-size:64px;font-weight:800;text-align:center;margin:12px 0 4px;text-shadow:0 0 30px currentColor}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
+.stats div{background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:10px}
+.stats b{display:block;font-size:17px;margin-top:4px}
+
+@media (max-width:1100px){#log{width:320px;height:180px}#help{display:none}}
+@media (max-width:820px){
+  #side{top:auto;height:42vh;width:auto;left:10px;bottom:10px}
+  #log{display:none}
+  #topbar{height:auto;flex-wrap:wrap;padding:6px;gap:4px}
+  .brand small,.tb.weather,.tb.att{display:none}
+  #cams{top:auto;bottom:calc(42vh + 18px);max-width:none}
+}
+</style>
+</head>
+<body>
+<div id="scene"></div>
+<div id="labels"></div>
+
+<!-- ============================== TOP BAR ============================== -->
+<header id="topbar" class="panel">
+  <div class="brand"><div class="logo"><i></i></div><div><b>MATCHGRID</b><small>ALDMERE ARENA · MATCH-DAY OPS</small></div></div>
+  <div class="tb"><div class="cap" id="phase">GATES OPEN</div><div class="clock-row"><span id="clock" class="num">00:00</span><span id="wall" class="num">13:30</span></div></div>
+  <div class="tb score"><span class="team home">ALD</span><span id="score" class="num">0–0</span><span class="team away">CVT</span></div>
+  <div class="tb att"><div class="cap">Attendance</div><div class="v num" id="attendance">0</div></div>
+  <div class="tb safety"><div class="cap">Safety rating</div><div class="row"><div class="meter"><i id="safetyFill"></i></div><span id="safetyVal" class="num">100</span><span id="safetyGrade">SECURE</span></div></div>
+  <div class="tb weather"><div class="cap">Weather</div><div class="v" id="weather" style="font-size:13px">☀ CLEAR 14°C</div></div>
+  <div class="spacer"></div>
+  <div class="ctrls">
+    <button class="btn" id="pauseBtn" title="Pause / resume (Space)">❚❚</button>
+    <button class="btn spd on" data-speed="1" title="Z">1×</button>
+    <button class="btn spd" data-speed="2" title="X">2×</button>
+    <button class="btn spd" data-speed="4" title="C">4×</button>
+    <button class="btn heat" id="heatBtn" title="Crowd density heatmap (H)">HEATMAP</button>
+  </div>
+</header>
+
+<!-- ============================== CAMERA PRESETS ============================== -->
+<nav id="cams" class="panel">
+  <span class="cap">Cam</span>
+  <button class="btn on" data-cam="overview">1 Overview</button>
+  <button class="btn" data-cam="pitch">2 Pitch</button>
+  <button class="btn" data-cam="N">3 North</button>
+  <button class="btn" data-cam="S">4 South</button>
+  <button class="btn" data-cam="W">5 West</button>
+  <button class="btn" data-cam="E">6 East</button>
+  <button class="btn" data-cam="free">Free</button>
+</nav>
+<div id="heatLegend" class="panel"><div class="cap">Crowd density</div><div class="grad"></div><div class="ends"><span>Sparse</span><span>Crush risk</span></div></div>
+
+<!-- ============================== SIDE PANEL ============================== -->
+<aside id="side" class="panel">
+  <section>
+    <div class="sec-h"><span class="cap">Key indicators</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="cap">Avg gate queue</div><div class="v num" id="kGate">0.0m</div><div class="s" id="kGateS">peak 0.0m</div></div>
+      <div class="kpi"><div class="cap">Kiosk load</div><div class="v num" id="kKiosk">0%</div><div class="s" id="kKioskS">0 in queues</div></div>
+      <div class="kpi"><div class="cap">Revenue</div><div class="v num" id="kRev">£0.0k</div><div class="s">concessions</div></div>
+      <div class="kpi"><div class="cap">Incidents</div><div class="v num" id="kInc">0 / 0</div><div class="s" id="kIncS">open / resolved</div></div>
+    </div>
+  </section>
+  <section>
+    <div class="sec-h"><span class="cap">Safety trend</span><span class="cap num" id="sparkMin">—</span></div>
+    <canvas id="spark" width="580" height="84"></canvas>
+  </section>
+  <section>
+    <div class="sec-h"><span class="cap">Gate queues</span><span class="cap">wait · people</span></div>
+    <div class="bars" id="gateBars"></div>
+  </section>
+  <section>
+    <div class="sec-h"><span class="cap">Kiosk queues</span></div>
+    <div class="kbars" id="kioskBars"></div>
+  </section>
+  <section>
+    <div class="sec-h"><span class="cap">Selected unit</span><span class="cap" id="unitCount"></span></div>
+    <div id="unitCard" class="empty">Click a unit marker or roster entry to select it, then click a location or an incident to send it.</div>
+  </section>
+  <section>
+    <div class="sec-h"><span class="cap">Unit roster</span></div>
+    <div class="roster" id="roster"></div>
+  </section>
+</aside>
+
+<!-- ============================== EVENT LOG ============================== -->
+<section id="log" class="panel">
+  <div class="sec-h" style="margin:0"><span class="cap">Event log</span><span class="cap" id="logCount">0 events</span></div>
+  <ul id="logList"></ul>
+</section>
+
+<div id="help" class="panel">
+  <kbd>LMB</kbd> select / send · <kbd>RMB</kbd> send · drag orbit · <kbd>RMB</kbd>-drag pan · <kbd>Space</kbd> pause · <kbd>Z X C</kbd> speed · <kbd>H</kbd> heatmap · <kbd>1–6</kbd> cams · <kbd>Tab</kbd> next unit · <kbd>Esc</kbd> deselect
+</div>
+
+<div id="banner"><h1 id="bannerT"></h1><p id="bannerS"></p></div>
+
+<!-- ============================== INTRO ============================== -->
+<div id="intro" class="overlay">
+  <div class="ov-card">
+    <h1>MATCH<span>GRID</span></h1>
+    <div class="sub">ALDMERE ARENA · ALDMERE AFC v CORVEL TOWN</div>
+    <p>You are the Safety Officer in the control room. Gates open at 13:30 and kick-off is at 14:30. Keep the crowd moving, the kiosks flowing and the safety rating high until the stadium is empty after full time.</p>
+    <div class="ov-grid">
+      <div><b style="color:var(--amber)">● Stewards</b>Kiosk queues, lost children, wet floors. Stationed at a gate or kiosk, they speed up throughput.</div>
+      <div><b style="color:var(--green)">● Medics</b>The only unit that can treat medical emergencies.</div>
+      <div><b style="color:var(--blue)">● Security</b>Best at crowd surges. Can also help with lost children and queues.</div>
+      <div><b style="color:var(--red)">● Incidents</b>Get worse until someone deals with them. If one stays critical for too long, it counts as a failure.</div>
+    </div>
+    <button class="cta" id="startBtn">OPEN THE GATES</button>
+  </div>
+</div>
+
+<!-- ============================== SUMMARY ============================== -->
+<div id="summary" class="overlay hidden">
+  <div class="ov-card">
+    <div class="sub" style="text-align:center">FULL TIME · OPERATIONS DEBRIEF</div>
+    <div class="grade" id="sumGrade">A</div>
+    <div style="text-align:center;color:var(--muted)" id="sumLine"></div>
+    <div class="stats" id="sumStats"></div>
+    <button class="cta" onclick="location.reload()">RUN ANOTHER MATCH DAY</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+/* =====================================================================
+   1. CONFIG — tweak the simulation here
+   ===================================================================== */
+const CFG = {
+  SIM_MIN_PER_SEC: 0.4,      // sim minutes per real second at 1x
+  AGENTS: 2200,              // crowd agents rendered
+  PEOPLE_PER_AGENT: 18,      // each agent represents this many fans
+  T_KICKOFF: 60, T_HALFTIME: 105, T_SECOND_HALF: 120, T_FULLTIME: 165, T_END: 200,
+  GATES_OPEN_CLOCK: 13 * 60 + 30, // 13:30 local time
+  RING_X: 86, RING_Z: 68,    // concourse ring centreline half-extents
+  GATE_THROUGHPUT: 12,       // agents/min per gate (base)
+  KIOSK_SERVICE: 5,          // agents/min per kiosk (base)
+  SPEND_PER_PERSON: 8.5,     // £
+  MAX_OPEN_INCIDENTS: 8,
+  CRITICAL_FAIL_AFTER: 16,   // sim minutes at 100% severity before failing
+  HOME: { name: 'Aldmere AFC', short: 'ALD', color: 0x45d8ff },
+  AWAY: { name: 'Corvel Town', short: 'CVT', color: 0xff4fa3 },
+};
+
+const UNIT_TYPES = {
+  steward:  { label: 'Steward',  prefix: 'ST', color: 0xffbe3b, css: '#ffbe3b', speed: 55, skills: 'Queues · Lost child · Hazards · Surges (slow)' },
+  medic:    { label: 'Medic',    prefix: 'MD', color: 0x3dff8c, css: '#3dff8c', speed: 60, skills: 'Medical emergencies' },
+  security: { label: 'Security', prefix: 'SC', color: 0x5b8cff, css: '#5b8cff', speed: 58, skills: 'Crowd surges · Lost child · Queues (slow)' },
+};
+
+// Incident catalogue. `units` maps unit type -> work rate multiplier (absent = cannot resolve).
+const INC = {
+  medical:   { name: 'Medical Emergency',    code: 'MED', units: { medic: 1 },                     growth: 6.5, weight: 14, start: 25 },
+  surge:     { name: 'Crowd Surge',          code: 'SRG', units: { security: 1, steward: 0.5 },    growth: 5.5, weight: 12, start: 30 },
+  kiosk:     { name: 'Kiosk Queue Overflow', code: 'QUE', units: { steward: 1, security: 0.4 },    growth: 4,   weight: 5,  start: 20 },
+  lostchild: { name: 'Lost Child',           code: 'LCH', units: { steward: 1, security: 0.6 },    growth: 3.5, weight: 8,  start: 20 },
+  weather:   { name: 'Wet Concourse Hazard', code: 'WET', units: { steward: 1 },                   growth: 3,   weight: 6,  start: 25 },
+};
+const RESOLVE_TIME = 2.5; // sim minutes for a 1.0-rate unit
+
+/* =====================================================================
+   2. UTILITIES
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const dist2D = (ax, az, bx, bz) => Math.hypot(ax - bx, az - bz);
+const pad2 = n => String(Math.floor(n)).padStart(2, '0');
+const mmss = m => pad2(m) + ':' + pad2((m - Math.floor(m)) * 60);
+const shuffle = arr => { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; };
+const wallClock = t => { const m = CFG.GATES_OPEN_CLOCK + t; return pad2((m / 60) % 24) + ':' + pad2(m % 60); };
+const fmtMoney = v => v >= 1e6 ? '£' + (v / 1e6).toFixed(2) + 'M' : '£' + (v / 1000).toFixed(1) + 'k';
+const easeInOut = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function weightedPick(entries) { // [[key, weight], ...]
+  const total = entries.reduce((s, e) => s + e[1], 0);
+  let r = Math.random() * total;
+  for (const [k, w] of entries) { if ((r -= w) <= 0) return k; }
+  return entries[entries.length - 1][0];
+}
+
+/* =====================================================================
+   3. GLOBAL SIMULATION STATE
+   ===================================================================== */
+const S = {
+  t: 0, speed: 1, paused: true, started: false, ended: false, phase: 'PRE',
+  score: { home: 0, away: 0 },
+  admitted: 0, egressed: 0, revenue: 0,
+  safety: 100, safetyDebt: 0, safetySum: 0, safetySamples: 0, safetyMin: 100, safetyHist: [], lastSample: -1,
+  incidents: [], incSeq: 0, resolved: 0, failed: 0, totalIncidents: 0,
+  raining: false, rainUntil: 0, weatherEvents: 0,
+  heatmap: false, selected: null, maxDensity: 0, peakGateQueue: 0,
+  celebrate: null,
+};
+
+function getPhase(t) {
+  if (t < CFG.T_KICKOFF) return 'PRE';
+  if (t < CFG.T_HALFTIME) return 'H1';
+  if (t < CFG.T_SECOND_HALF) return 'HT';
+  if (t < CFG.T_FULLTIME) return 'H2';
+  return 'FT';
+}
+
+/* =====================================================================
+   4. RENDERER, SCENE, CAMERA, LIGHTS
+   ===================================================================== */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+$('scene').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x04070d);
+scene.fog = new THREE.Fog(0x04070d, 280, 680);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.5, 2000);
+camera.position.set(0, 200, 175);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 8;
+controls.maxDistance = 480;
+controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+
+scene.add(new THREE.HemisphereLight(0x9cc4ff, 0x0b1220, 0.8));
+scene.add(new THREE.AmbientLight(0x3a4a66, 0.35));
+const sun = new THREE.DirectionalLight(0xdfe9ff, 1.3);
+sun.position.set(90, 170, 70);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -140, right: 140, top: 120, bottom: -120, near: 10, far: 420 });
+sun.shadow.bias = -0.0005;
+scene.add(sun);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+/* =====================================================================
+   5. SHARED MATERIALS & HELPERS
+   ===================================================================== */
+const MAT = {
+  ground:   new THREE.MeshStandardMaterial({ color: 0x070c14, roughness: 1 }),
+  concourse:new THREE.MeshStandardMaterial({ color: 0x111b29, roughness: .95 }),
+  plaza:    new THREE.MeshStandardMaterial({ color: 0x0c1520, roughness: .95 }),
+  apron:    new THREE.MeshStandardMaterial({ color: 0x0a2a1a, roughness: 1 }),
+  wall:     new THREE.MeshStandardMaterial({ color: 0x182335, roughness: .8, flatShading: true }),
+  struct:   new THREE.MeshStandardMaterial({ color: 0x1c2738, roughness: .7, flatShading: true }),
+  white:    new THREE.MeshStandardMaterial({ color: 0xe8eef5, roughness: .5 }),
+  edge:     new THREE.LineBasicMaterial({ color: 0x2ef2ff, transparent: true, opacity: .16 }),
+  edgeAway: new THREE.LineBasicMaterial({ color: 0xff3d9a, transparent: true, opacity: .2 }),
+};
+const neon = c => new THREE.MeshBasicMaterial({ color: c });
+
+function addEdges(mesh, mat = MAT.edge) {
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(mesh.geometry), mat));
+  return mesh;
+}
+function box(w, h, d, mat, x = 0, y = 0, z = 0, parent = scene) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  parent.add(m);
+  return m;
+}
+// Canvas-text sprite used for in-world signage
+function makeSign(text, color = '#2ef2ff', height = 3.2) {
+  const c = document.createElement('canvas');
+  const ctx = c.getContext('2d');
+  const font = '800 44px Inter, system-ui, sans-serif';
+  ctx.font = font;
+  const w = Math.ceil(ctx.measureText(text).width) + 40;
+  c.width = w; c.height = 72;
+  ctx.font = font;
+  ctx.fillStyle = 'rgba(5,10,18,0.78)';
+  ctx.strokeStyle = color; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(2, 2, w - 4, 68, 12); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(text, w / 2, 39);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  spr.scale.set(height * w / 72, height, 1);
+  scene.add(spr);
+  return spr;
+}
+
+// Objects that a "move here" click can land on
+const groundTargets = [];
+
+/* =====================================================================
+   6. CONCOURSE RING NAVIGATION
+   The concourse is a rectangle loop; agents & units travel along it.
+   Positions on the loop are parameterised by arc-length `s`.
+   ===================================================================== */
+const RX = CFG.RING_X, RZ = CFG.RING_Z;
+const RING_CORNERS = [[-RX, -RZ], [RX, -RZ], [RX, RZ], [-RX, RZ]];
+const RING_LEN = [2 * RX, 2 * RZ, 2 * RX, 2 * RZ];
+const RING_S = [0, 2 * RX, 2 * RX + 2 * RZ, 4 * RX + 2 * RZ];
+const RING_P = 4 * RX + 4 * RZ;
+const wrapS = s => ((s % RING_P) + RING_P) % RING_P;
+
+function ringPoint(s) {
+  s = wrapS(s);
+  for (let e = 3; e >= 0; e--) {
+    if (s >= RING_S[e]) {
+      const t = (s - RING_S[e]) / RING_LEN[e];
+      const a = RING_CORNERS[e], b = RING_CORNERS[(e + 1) % 4];
+      return [lerp(a[0], b[0], t), lerp(a[1], b[1], t)];
+    }
+  }
+}
+function ringProject(x, z) {
+  let best = null;
+  for (let e = 0; e < 4; e++) {
+    const a = RING_CORNERS[e], b = RING_CORNERS[(e + 1) % 4];
+    const dx = b[0] - a[0], dz = b[1] - a[1], len2 = dx * dx + dz * dz;
+    const t = clamp(((x - a[0]) * dx + (z - a[1]) * dz) / len2, 0, 1);
+    const px = a[0] + dx * t, pz = a[1] + dz * t;
+    const d = (x - px) ** 2 + (z - pz) ** 2;
+    if (!best || d < best.d) best = { s: RING_S[e] + t * RING_LEN[e], x: px, z: pz, d };
+  }
+  return best;
+}
+const ringDist = (a, b) => { const f = wrapS(b - a); return Math.min(f, RING_P - f); };
+// Waypoints (corners + destination) along the shorter direction from sA to sB
+function ringRoute(sA, sB) {
+  const fwd = wrapS(sB - sA), pts = [];
+  const goFwd = fwd <= RING_P / 2, span = goFwd ? fwd : RING_P - fwd;
+  RING_S.map((c, i) => ({ i, o: goFwd ? wrapS(c - sA) : wrapS(sA - c) }))
+    .filter(c => c.o > 0.01 && c.o < span - 0.01)
+    .sort((a, b) => a.o - b.o)
+    .forEach(c => pts.push(RING_CORNERS[c.i]));
+  pts.push(ringPoint(sB));
+  return pts;
+}
+// 2D nav path for units: straight inside the bowl, otherwise via the concourse ring
+const inBowl = (x, z) => Math.abs(x) < 80 && Math.abs(z) < 62;
+function navPath(fx, fz, tx, tz) {
+  if (inBowl(fx, fz) && inBowl(tx, tz)) return [[tx, tz]];
+  const a = ringProject(fx, fz), b = ringProject(tx, tz);
+  return [[a.x, a.z], ...ringRoute(a.s, b.s), [tx, tz]];
+}
+
+/* =====================================================================
+   7. WORLD BUILD — ground, pitch, stands, concourse, gates, kiosks...
+   ===================================================================== */
+// ---------- 7a. Ground ----------
+(function buildGround() {
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(700, 700), MAT.ground);
+  g.rotation.x = -Math.PI / 2; g.receiveShadow = true;
+  scene.add(g); groundTargets.push(g);
+  const grid = new THREE.GridHelper(700, 70, 0x0f2a40, 0x0a1826);
+  grid.position.y = 0.02; grid.material.transparent = true; grid.material.opacity = .55;
+  scene.add(grid);
+})();
+
+// ---------- 7b. Pitch ----------
+(function buildPitch() {
+  const PPM = 8, W = 105, H = 68;
+  const c = document.createElement('canvas'); c.width = W * PPM; c.height = H * PPM;
+  const x = c.getContext('2d');
+  for (let i = 0; i < 14; i++) { x.fillStyle = i % 2 ? '#0f4228' : '#0d3a23'; x.fillRect(i * c.width / 14, 0, c.width / 14 + 1, c.height); }
+  x.strokeStyle = 'rgba(235,255,245,.85)'; x.lineWidth = 0.14 * PPM;
+  const m = v => v * PPM, L = (x1, y1, w, h) => x.strokeRect(m(x1), m(y1), m(w), m(h));
+  L(0.5, 0.5, W - 1, H - 1);
+  x.beginPath(); x.moveTo(m(W / 2), m(.5)); x.lineTo(m(W / 2), m(H - .5)); x.stroke();
+  x.beginPath(); x.arc(m(W / 2), m(H / 2), m(9.15), 0, Math.PI * 2); x.stroke();
+  for (const side of [0, 1]) {
+    const gx = side ? W - .5 : .5, dir = side ? -1 : 1;
+    L(side ? gx - 16.5 : gx, H / 2 - 20.16, 16.5, 40.32);
+    L(side ? gx - 5.5 : gx, H / 2 - 9.16, 5.5, 18.32);
+    x.beginPath(); x.arc(m(gx + dir * 11), m(H / 2), m(9.15), side ? Math.PI * 0.7 : -Math.PI * 0.3, side ? Math.PI * 1.3 : Math.PI * 0.3); x.stroke();
+    x.fillStyle = 'rgba(235,255,245,.85)'; x.beginPath(); x.arc(m(gx + dir * 11), m(H / 2), m(.3), 0, 7); x.fill();
+  }
+  x.beginPath(); x.arc(m(W / 2), m(H / 2), m(.3), 0, 7); x.fill();
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 8;
+
+  const apron = new THREE.Mesh(new THREE.PlaneGeometry(116, 80), MAT.apron);
+  apron.rotation.x = -Math.PI / 2; apron.position.y = 0.04; apron.receiveShadow = true;
+  scene.add(apron); groundTargets.push(apron);
+  const pitch = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: tex, roughness: .95 }));
+  pitch.rotation.x = -Math.PI / 2; pitch.position.y = 0.08; pitch.receiveShadow = true;
+  scene.add(pitch); groundTargets.push(pitch);
+  // Goals
+  for (const sx of [-1, 1]) {
+    const gx = sx * 52.7;
+    box(.15, 2.44, .15, MAT.white, gx, 1.22, -3.66);
+    box(.15, 2.44, .15, MAT.white, gx, 1.22, 3.66);
+    box(.15, .15, 7.47, MAT.white, gx, 2.44, 0);
+  }
+})();
+
+// ---------- 7c. Stands & sections ----------
+const STAND_DEPTH = 22, TIERS = 7, TIER_D = STAND_DEPTH / TIERS, AISLE = 1.6;
+const tierTop = k => 1.2 + k * 1.45;
+const STANDS = [
+  { id: 'N', name: 'North Stand',     pos: [0, -40], rot: 0,            length: 116, sections: ['N1', 'N2', 'N3'], team: 'home' },
+  { id: 'S', name: 'South Stand',     pos: [0, 40],  rot: Math.PI,      length: 116, sections: ['S1', 'S2', 'S3'], team: 'home' },
+  { id: 'W', name: 'West End',        pos: [-58, 0], rot: Math.PI / 2,  length: 80,  sections: ['W1', 'W2'],       team: 'home' },
+  { id: 'E', name: 'East End (Away)', pos: [58, 0],  rot: -Math.PI / 2, length: 80,  sections: ['E1', 'E2'],       team: 'away' },
+];
+const sections = [];
+
+(function buildStands() {
+  for (const st of STANDS) {
+    const g = new THREE.Group();
+    g.position.set(st.pos[0], 0, st.pos[1]);
+    g.rotation.y = st.rot;
+    scene.add(g);
+    g.updateMatrixWorld(true);
+    const toW = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(g.matrixWorld);
+    const away = st.team === 'away';
+    const mat = new THREE.MeshStandardMaterial({ color: away ? 0x3b1530 : 0x143049, roughness: .85, flatShading: true });
+    const edgeMat = away ? MAT.edgeAway : MAT.edge;
+    const n = st.sections.length, L = st.length;
+    const secLen = (L - AISLE * (n - 1)) / n;
+
+    st.sections.forEach((sid, si) => {
+      const a = -L / 2 + si * (secLen + AISLE), b = a + secLen, cx = (a + b) / 2;
+      const sec = { id: sid, stand: st, team: st.team, seats: [] };
+      for (let k = 0; k < TIERS; k++) {
+        const h = tierTop(k);
+        const m = box(secLen, h, TIER_D, mat, cx, h / 2, -(k + 0.5) * TIER_D, g);
+        addEdges(m, edgeMat);
+        groundTargets.push(m);
+        for (let r = 0; r < 2; r++) {
+          const lz = -(k * TIER_D + TIER_D * (0.3 + 0.4 * r));
+          for (let lx = a + 0.9; lx <= b - 0.9; lx += 1.55) {
+            const p = toW(lx, h, lz);
+            sec.seats.push([p.x, p.y, p.z]);
+          }
+        }
+      }
+      sec.backTop = toW(cx, tierTop(TIERS - 1), -STAND_DEPTH + 0.8);
+      sec.backGround = toW(cx, 0, -STAND_DEPTH - 4);
+      const ent = toW(cx, 0, -STAND_DEPTH - 6);
+      sec.ring = ringProject(ent.x, ent.z);
+      sec.center = toW(cx, 5, -STAND_DEPTH / 2);
+      const c1 = toW(a, 0, 0), c2 = toW(b, 0, -STAND_DEPTH);
+      sec.box = { x0: Math.min(c1.x, c2.x), x1: Math.max(c1.x, c2.x), z0: Math.min(c1.z, c2.z), z1: Math.max(c1.z, c2.z) };
+      const sign = makeSign(sid, away ? '#ff3d9a' : '#2ef2ff', 3);
+      sign.position.copy(toW(cx, tierTop(TIERS - 1) + 5.5, -STAND_DEPTH + 1));
+      sections.push(sec);
+    });
+
+    // Back wall with neon crown strip
+    const wh = tierTop(TIERS - 1) + 2.4;
+    addEdges(box(L, wh, 0.8, MAT.wall, 0, wh / 2, -STAND_DEPTH - 0.4, g), edgeMat);
+    const strip = new THREE.Mesh(new THREE.BoxGeometry(L, 0.25, 0.3), neon(away ? 0xff3d9a : 0x2ef2ff));
+    strip.position.set(0, wh + 0.1, -STAND_DEPTH - 0.4); g.add(strip);
+    // Pitch-side advertising board
+    const board = new THREE.Mesh(new THREE.BoxGeometry(L - 4, 0.9, 0.2), neon(away ? 0x5a1438 : 0x0e4a5a));
+    board.position.set(0, 0.45, 2.2); g.add(board);
+
+    st.group = g;
+    st.inv = g.matrixWorld.clone().invert();
+    const name = makeSign(st.name.toUpperCase(), away ? '#ff3d9a' : '#9fdcff', 4.2);
+    name.position.copy(toW(0, tierTop(TIERS - 1) + 11, -STAND_DEPTH));
+  }
+})();
+
+const _hv = new THREE.Vector3();
+function heightAt(x, z) {
+  for (const st of STANDS) {
+    _hv.set(x, 0, z).applyMatrix4(st.inv);
+    if (Math.abs(_hv.x) <= st.length / 2 && _hv.z <= 0 && _hv.z >= -STAND_DEPTH) {
+      return tierTop(Math.min(TIERS - 1, Math.floor(-_hv.z / TIER_D)));
+    }
+  }
+  return 0;
+}
+
+// ---------- 7d. Concourse ring, plazas, outer wall ----------
+(function buildConcourse() {
+  const strip = (w, d, x, z, mat = MAT.concourse) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), mat);
+    m.rotation.x = -Math.PI / 2; m.position.set(x, 0.03, z); m.receiveShadow = true;
+    scene.add(m); groundTargets.push(m);
+  };
+  strip(186, 13, 0, -68.5); strip(186, 13, 0, 68.5);
+  strip(13, 124, -86.5, 0); strip(13, 124, 86.5, 0);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) strip(22, 22, sx * 69, sz * 51, MAT.plaza);
+  // Dashed guidance line along the ring centreline
+  const pts = [...RING_CORNERS, RING_CORNERS[0]].map(p => new THREE.Vector3(p[0], 0.1, p[1]));
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineDashedMaterial({ color: 0x2ef2ff, dashSize: 3, gapSize: 2.5, transparent: true, opacity: .35 }));
+  line.computeLineDistances(); scene.add(line);
+  // Outer wall with gaps at the four corner gates
+  const WX = 93, WZ = 75, h = 4;
+  for (const sz of [-1, 1]) addEdges(box(164, h, 1, MAT.wall, 0, h / 2, sz * WZ));
+  for (const sx of [-1, 1]) addEdges(box(1, h, 128, MAT.wall, sx * WX, h / 2, 0));
+})();
+
+// ---------- 7e. Gates (corner entrances) ----------
+const gates = [
+  { id: 'A', sx: -1, sz: -1 }, { id: 'B', sx: 1, sz: -1 },
+  { id: 'C', sx: 1, sz: 1 },   { id: 'D', sx: -1, sz: 1 },
+].map(g => {
+  const inv = Math.SQRT1_2;
+  const gate = {
+    id: g.id, name: 'Gate ' + g.id,
+    inner: [g.sx * RX, g.sz * RZ],
+    pos: [g.sx * 91, g.sz * 73],
+    out: [g.sx * inv, g.sz * inv],
+    perp: [-g.sz * inv, g.sx * inv],
+    queue: [], acc: 0, eff: CFG.GATE_THROUGHPUT, qTime: 0,
+  };
+  gate.ring = ringProject(gate.inner[0], gate.inner[1]);
+  // Structure: two pylons + neon lintel, oriented across the diagonal
+  const grp = new THREE.Group();
+  grp.position.set(gate.pos[0], 0, gate.pos[1]);
+  grp.rotation.y = Math.atan2(-gate.perp[1], gate.perp[0]);
+  scene.add(grp);
+  for (const s of [-1, 1]) addEdges(box(1.6, 9, 1.6, MAT.struct, s * 7.5, 4.5, 0, grp));
+  box(16.6, 1.2, 1.6, MAT.struct, 0, 9.4, 0, grp);
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(15, .35, 1.7), neon(0x2ef2ff));
+  lintel.position.set(0, 8.6, 0); grp.add(lintel);
+  for (let i = -3; i <= 3; i++) box(.3, 1.2, .3, MAT.struct, i * 1.9, .6, 0, grp); // turnstiles
+  const sign = makeSign('GATE ' + g.id, '#2ef2ff', 3.6);
+  sign.position.set(gate.pos[0], 13, gate.pos[1]);
+  return gate;
+});
+
+// ---------- 7f. Kiosks ----------
+const kiosks = [
+  ['K1', -35, -72.5, 0, 1], ['K2', 35, -72.5, 0, 1], ['K3', 90.5, -24, -1, 0], ['K4', 90.5, 24, -1, 0],
+  ['K5', 35, 72.5, 0, -1], ['K6', -35, 72.5, 0, -1], ['K7', -90.5, 24, 1, 0], ['K8', -90.5, -24, 1, 0],
+].map(([id, x, z, nx, nz]) => {
+  const k = { id, pos: [x, z], n: [nx, nz], tan: [-nz, nx], queue: [], acc: 0, eff: CFG.KIOSK_SERVICE, served: 0 };
+  k.ringPt = [x + nx * 4.5, z + nz * 4.5];
+  k.ring = ringProject(k.ringPt[0], k.ringPt[1]);
+  const grp = new THREE.Group();
+  grp.position.set(x, 0, z);
+  grp.rotation.y = Math.atan2(nx, nz);
+  scene.add(grp);
+  addEdges(box(7, 3.4, 3, MAT.struct, 0, 1.7, 0, grp));
+  const awning = new THREE.Mesh(new THREE.BoxGeometry(7.4, .3, 1.2), neon(0xffbe3b));
+  awning.position.set(0, 3.2, 1.6); grp.add(awning);
+  const sign = makeSign(id, '#ffbe3b', 2.4);
+  sign.position.set(x, 6, z);
+  return k;
+});
+
+// ---------- 7g. First aid points ----------
+const firstAid = [['FA-N', 0, -72.5, 0, 1], ['FA-S', 0, 72.5, 0, -1], ['FA-W', -90.5, 0, 1, 0], ['FA-E', 90.5, 0, -1, 0]]
+  .map(([id, x, z, nx, nz]) => {
+    const grp = new THREE.Group();
+    grp.position.set(x, 0, z); grp.rotation.y = Math.atan2(nx, nz); scene.add(grp);
+    addEdges(box(4.5, 3, 3, MAT.white, 0, 1.5, 0, grp));
+    const c1 = new THREE.Mesh(new THREE.BoxGeometry(2, .5, .1), neon(0xff3344)); c1.position.set(0, 1.8, 1.56); grp.add(c1);
+    const c2 = new THREE.Mesh(new THREE.BoxGeometry(.5, 2, .1), neon(0xff3344)); c2.position.set(0, 1.8, 1.56); grp.add(c2);
+    const sign = makeSign('✚ ' + id, '#ff5566', 2.4); sign.position.set(x, 6, z);
+    return { id, pos: [x, z], post: [x + nx * 4, z + nz * 4] };
+  });
+
+// ---------- 7h. Floodlights ----------
+(function buildFloodlights() {
+  // Soft radial glow texture for the light heads
+  const gc = document.createElement('canvas'); gc.width = gc.height = 64;
+  const gx = gc.getContext('2d'), grad = gx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  grad.addColorStop(0, 'rgba(255,255,255,1)'); grad.addColorStop(.25, 'rgba(200,235,255,.5)'); grad.addColorStop(1, 'rgba(200,235,255,0)');
+  gx.fillStyle = grad; gx.fillRect(0, 0, 64, 64);
+  const glowTex = new THREE.CanvasTexture(gc);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+    const x = sx * 69, z = sz * 51;
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(.5, .9, 42, 6), MAT.struct);
+    mast.position.set(x, 21, z); mast.castShadow = true; scene.add(mast);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(9, 4, 1), neon(0xe8f6ff));
+    head.position.set(x, 43, z); head.lookAt(0, 0, 0); scene.add(head);
+    const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xbfe8ff, transparent: true, opacity: .6, blending: THREE.AdditiveBlending, depthWrite: false }));
+    glow.scale.set(22, 22, 1); glow.position.copy(head.position); scene.add(glow);
+  }
+})();
+
+/* =====================================================================
+   8. ZONE NAMING (for logs & labels)
+   ===================================================================== */
+function zoneName(x, z) {
+  for (const s of sections) if (x >= s.box.x0 && x <= s.box.x1 && z >= s.box.z0 && z <= s.box.z1) return 'Section ' + s.id;
+  for (const g of gates) if (dist2D(x, z, g.pos[0], g.pos[1]) < 14) return g.name;
+  for (const k of kiosks) if (dist2D(x, z, k.pos[0], k.pos[1]) < 9) return 'Kiosk ' + k.id;
+  if (Math.abs(x) <= 52.5 && Math.abs(z) <= 34) return 'Pitch';
+  if (Math.abs(z) > 62) return z < 0 ? 'North Concourse' : 'South Concourse';
+  if (Math.abs(x) > 80) return x < 0 ? 'West Concourse' : 'East Concourse';
+  return 'Inner Plaza';
+}
+
+/* =====================================================================
+   9. CROWD AGENTS
+   Each agent is a small instanced box representing PEOPLE_PER_AGENT fans.
+   States: pending → queueGate → walk → seated → (trip: walk/queueKiosk/loiter)
+           → walk(exit) → gone
+   ===================================================================== */
+const agents = [];
+const agentGeo = new THREE.BoxGeometry(0.75, 1.5, 0.75); agentGeo.translate(0, 0.75, 0);
+const agentMesh = new THREE.InstancedMesh(agentGeo, new THREE.MeshLambertMaterial(), CFG.AGENTS);
+agentMesh.frustumCulled = false;
+agentMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+scene.add(agentMesh);
+
+(function buildAgents() {
+  // Precompute per-section nearest gates & kiosks (by ring distance)
+  for (const s of sections) {
+    s.gatesByDist = [...gates].sort((a, b) => ringDist(s.ring.s, a.ring.s) - ringDist(s.ring.s, b.ring.s));
+    s.kiosksByDist = [...kiosks].sort((a, b) => ringDist(s.ring.s, a.ring.s) - ringDist(s.ring.s, b.ring.s));
+  }
+  const pool = shuffle(sections.flatMap(s => s.seats.map(seat => ({ s, seat }))));
+  const col = new THREE.Color();
+  for (let i = 0; i < CFG.AGENTS; i++) {
+    const { s, seat } = pool[i];
+    const late = Math.random() < 0.05;
+    const a = {
+      i, sec: s, seat, team: s.team,
+      x: 0, y: 0, z: 0, ox: rand(-2, 2), oz: rand(-2, 2),
+      spd: rand(32, 44), phase: Math.random() * 6.28,
+      arrive: late ? rand(58, 78) : 62 * Math.pow(Math.random(), 0.62),
+      gate: Math.random() < 0.75 ? s.gatesByDist[0] : s.gatesByDist[1],
+      exitGate: Math.random() < 0.8 ? s.gatesByDist[0] : s.gatesByDist[1],
+      preKiosk: Math.random() < 0.18,
+      state: 'pending', path: null, pi: 0, dest: null, slot: 0,
+      kiosk: null, qStart: 0, until: 0, tripAt: 0, tripKind: null, exitAt: 0, exiting: false,
+    };
+    agents.push(a);
+    col.setHex(a.team === 'away' ? CFG.AWAY.color : CFG.HOME.color).multiplyScalar(rand(0.75, 1.05));
+    agentMesh.setColorAt(i, col);
+  }
+  agentMesh.instanceColor.needsUpdate = true;
+})();
+
+// ---------- 9a. Route building blocks ----------
+const ringWp = (a, x, z) => [x + a.ox, 0, z + a.oz];
+const ringLeg = (a, sA, sB) => ringRoute(sA, sB).map(p => ringWp(a, p[0], p[1]));
+const toSeatLeg = a => {
+  const s = a.sec, j = 0.6;
+  return [[s.backGround.x + a.ox * j, 0, s.backGround.z + a.oz * j],
+          [s.backTop.x + a.ox * j, s.backTop.y, s.backTop.z + a.oz * j], a.seat.slice()];
+};
+const fromSeatLeg = a => {
+  const s = a.sec, j = 0.6;
+  return [[s.backTop.x + a.ox * j, s.backTop.y, s.backTop.z + a.oz * j],
+          [s.backGround.x + a.ox * j, 0, s.backGround.z + a.oz * j], ringWp(a, s.ring.x, s.ring.z)];
+};
+const pickKiosk = sec => Math.random() < 0.65 ? sec.kiosksByDist[0] : sec.kiosksByDist[1];
+function setWalk(a, path, dest) { a.path = path; a.pi = 0; a.dest = dest; a.state = 'walk'; }
+
+function gateSlot(g, i) {
+  const row = Math.floor(i / 8), col = i % 8, d = 3 + row * 1.05, l = (col - 3.5) * 1.05;
+  return [g.pos[0] + g.out[0] * d + g.perp[0] * l, g.pos[1] + g.out[1] * d + g.perp[1] * l];
+}
+function kioskSlot(k, i) {
+  const row = Math.floor(i / 10), col = i % 10, d = 2.4 + row * 0.95, l = (col - 4.5) * 0.95;
+  return [k.pos[0] + k.n[0] * d + k.tan[0] * l, k.pos[1] + k.n[1] * d + k.tan[1] * l];
+}
+
+// ---------- 9b. Agent lifecycle transitions ----------
+function spawnAgent(a) {
+  const g = a.gate, d = rand(28, 58), l = rand(-16, 16);
+  a.x = g.pos[0] + g.out[0] * d + g.perp[0] * l;
+  a.z = g.pos[1] + g.out[1] * d + g.perp[1] * l;
+  a.y = 0;
+  a.state = 'queueGate';
+  g.queue.push(a);
+}
+function admit(a) {
+  S.admitted++;
+  const g = a.gate;
+  const path = [[g.pos[0] + a.ox * .5, 0, g.pos[1] + a.oz * .5], ringWp(a, g.inner[0], g.inner[1])];
+  if (a.preKiosk) {
+    a.kiosk = pickKiosk(a.sec);
+    setWalk(a, [...path, ...ringLeg(a, g.ring.s, a.kiosk.ring.s)], 'kiosk');
+  } else {
+    setWalk(a, [...path, ...ringLeg(a, g.ring.s, a.sec.ring.s), ...toSeatLeg(a)], 'seat');
+  }
+}
+function afterKiosk(a) {
+  const k = a.kiosk;
+  setWalk(a, [ringWp(a, k.ring.x, k.ring.z), ...ringLeg(a, k.ring.s, a.sec.ring.s), ...toSeatLeg(a)], 'seat');
+}
+function startTrip(a) {
+  const s = a.sec;
+  if (a.tripKind === 'kiosk') {
+    a.kiosk = pickKiosk(s);
+    setWalk(a, [...fromSeatLeg(a), ...ringLeg(a, s.ring.s, a.kiosk.ring.s)], 'kiosk');
+  } else {
+    setWalk(a, [...fromSeatLeg(a), ...ringLeg(a, s.ring.s, s.ring.s + rand(-20, 20))], 'loiter');
+  }
+}
+function returnToSeat(a) {
+  const rp = ringProject(a.x - a.ox, a.z - a.oz);
+  setWalk(a, [ringWp(a, rp.x, rp.z), ...ringLeg(a, rp.s, a.sec.ring.s), ...toSeatLeg(a)], 'seat');
+}
+function leaveQueue(q, a) { const i = q.indexOf(a); if (i >= 0) q.splice(i, 1); }
+function startExit(a) {
+  a.exiting = true;
+  if (a.state === 'queueGate') { leaveQueue(a.gate.queue, a); a.state = 'gone'; return; }
+  if (a.state === 'queueKiosk') leaveQueue(a.kiosk.queue, a);
+  const g = a.exitGate;
+  let path;
+  if (a.state === 'seated') path = [...fromSeatLeg(a), ...ringLeg(a, a.sec.ring.s, g.ring.s)];
+  else { const rp = ringProject(a.x, a.z); path = [ringWp(a, rp.x, rp.z), ...ringLeg(a, rp.s, g.ring.s)]; }
+  const d = rand(25, 55), l = rand(-16, 16);
+  path.push([g.pos[0], 0, g.pos[1]], [g.pos[0] + g.out[0] * d + g.perp[0] * l, 0, g.pos[1] + g.out[1] * d + g.perp[1] * l]);
+  setWalk(a, path, 'exit');
+}
+function arrive(a) {
+  switch (a.dest) {
+    case 'seat': a.state = 'seated'; [a.x, a.y, a.z] = a.seat; break;
+    case 'kiosk': a.state = 'queueKiosk'; a.qStart = S.t; a.kiosk.queue.push(a); break;
+    case 'loiter': a.state = 'loiter'; a.until = S.t + rand(3, 7); break;
+    case 'exit': a.state = 'gone'; S.egressed++; break;
+  }
+}
+
+// ---------- 9c. Movement primitives ----------
+function moveToward(a, tx, ty, tz, step) {
+  const dx = tx - a.x, dy = ty - a.y, dz = tz - a.z, d = Math.hypot(dx, dy, dz);
+  if (d <= step || d < 1e-4) { a.x = tx; a.y = ty; a.z = tz; return true; }
+  const k = step / d; a.x += dx * k; a.y += dy * k; a.z += dz * k;
+  return false;
+}
+function followPath(a, step) {
+  while (step > 0 && a.pi < a.path.length) {
+    const p = a.path[a.pi];
+    const d = Math.hypot(p[0] - a.x, p[1] - a.y, p[2] - a.z);
+    if (d <= step) { a.x = p[0]; a.y = p[1]; a.z = p[2]; step -= d; a.pi++; }
+    else { moveToward(a, p[0], p[1], p[2], step); step = 0; }
+  }
+  return a.pi >= a.path.length;
+}
+
+// ---------- 9d. Per-step agent update ----------
+function updateAgents(dt) {
+  const t = S.t, wx = S.raining ? 0.85 : 1;
+  for (const a of agents) {
+    switch (a.state) {
+      case 'pending':
+        if (t >= a.arrive) { if (S.phase === 'FT') a.state = 'gone'; else spawnAgent(a); }
+        break;
+      case 'queueGate': { const p = gateSlot(a.gate, a.slot); moveToward(a, p[0], 0, p[1], a.spd * wx * dt); break; }
+      case 'queueKiosk': {
+        const p = kioskSlot(a.kiosk, a.slot); moveToward(a, p[0], 0, p[1], a.spd * wx * dt);
+        const inBreak = S.phase === 'PRE' || S.phase === 'HT';
+        if (!inBreak && t - a.qStart > 8) { leaveQueue(a.kiosk.queue, a); returnToSeat(a); }
+        break;
+      }
+      case 'walk': if (followPath(a, a.spd * wx * dt)) arrive(a); break;
+      case 'loiter': if (t >= a.until) returnToSeat(a); break;
+      case 'seated': if (a.tripAt && t >= a.tripAt) { a.tripAt = 0; startTrip(a); } break;
+    }
+    if (a.exitAt && t >= a.exitAt && !a.exiting && a.state !== 'pending' && a.state !== 'gone') startExit(a);
+  }
+}
+
+// ---------- 9e. Gate & kiosk processing ----------
+function nearbyUnits(type, x, z, r) {
+  let n = 0;
+  for (const u of units) if (u.type === type && u.state !== 'moving' && dist2D(u.pos.x, u.pos.z, x, z) < r) n++;
+  return n;
+}
+const hasOpenIncident = (type, ref) => S.incidents.some(i => i.type === type && i.ref === ref);
+
+function updateGates(dt) {
+  let peak = 0;
+  for (const g of gates) {
+    const stewards = Math.min(2, nearbyUnits('steward', g.inner[0], g.inner[1], 14) + nearbyUnits('steward', g.pos[0], g.pos[1], 10));
+    g.boost = stewards;
+    g.eff = CFG.GATE_THROUGHPUT * (1 + 0.3 * stewards) * (hasOpenIncident('surge', g) ? 0.4 : 1) * (S.raining ? 0.9 : 1);
+    g.queue.forEach((a, i) => a.slot = i);
+    g.acc = Math.min(2, g.acc + g.eff * dt);
+    while (g.acc >= 1 && g.queue.length) {
+      const front = g.queue[0], p = gateSlot(g, 0);
+      if (dist2D(front.x, front.z, p[0], p[1]) > 2.5) break;
+      g.queue.shift(); g.acc -= 1; admit(front);
+    }
+    g.qTime = g.queue.length / g.eff;
+    peak = Math.max(peak, g.qTime);
+  }
+  S.peakGateQueue = Math.max(S.peakGateQueue, peak);
+}
+function updateKiosks(dt) {
+  for (const k of kiosks) {
+    const stewards = Math.min(2, nearbyUnits('steward', k.pos[0], k.pos[1], 10));
+    k.boost = stewards;
+    k.eff = CFG.KIOSK_SERVICE * (1 + 0.35 * stewards) * (hasOpenIncident('kiosk', k) ? 0.5 : 1);
+    k.queue.forEach((a, i) => a.slot = i);
+    k.acc = Math.min(2, k.acc + k.eff * dt);
+    while (k.acc >= 1 && k.queue.length) {
+      const front = k.queue[0], p = kioskSlot(k, 0);
+      if (dist2D(front.x, front.z, p[0], p[1]) > 2.5) break;
+      k.queue.shift(); k.acc -= 1; k.served++;
+      S.revenue += CFG.PEOPLE_PER_AGENT * CFG.SPEND_PER_PERSON * rand(0.75, 1.3);
+      afterKiosk(front);
+    }
+  }
+}
+
+// ---------- 9f. Instance matrices ----------
+const _m4 = new THREE.Matrix4(), _zero = new THREE.Matrix4().makeScale(0, 0, 0);
+function renderAgents(now) {
+  const cel = S.celebrate && now < S.celebrate.until ? S.celebrate.team : null;
+  for (const a of agents) {
+    if (a.state === 'pending' || a.state === 'gone') { agentMesh.setMatrixAt(a.i, _zero); continue; }
+    let y = a.y;
+    if (a.state === 'seated' && cel === a.team) y += Math.abs(Math.sin(now * 0.012 + a.phase)) * 0.9;
+    _m4.makeTranslation(a.x, y, a.z);
+    agentMesh.setMatrixAt(a.i, _m4);
+  }
+  agentMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* =====================================================================
+   10. RESPONSE UNITS (stewards, medics, security)
+   ===================================================================== */
+const units = [], unitHitboxes = [];
+const labelsEl = $('labels');
+
+function makeUnit(type, home) {
+  const cfg = UNIT_TYPES[type];
+  const n = units.filter(u => u.type === type).length + 1;
+  const u = { id: units.length, type, cfg, callsign: `${cfg.prefix}-${n}`, home: home.slice(),
+    pos: new THREE.Vector3(home[0], heightAt(home[0], home[1]), home[1]),
+    path: [], pi: 0, state: 'idle', incident: null, tasks: 0, travelled: 0, hinted: null, dest: null };
+  const g = new THREE.Group();
+  const ring = new THREE.Mesh(new THREE.RingGeometry(1.4, 1.9, 24), new THREE.MeshBasicMaterial({ color: cfg.color, transparent: true, opacity: .75, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2; ring.position.y = .15; g.add(ring);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.55, .8, 2.3, 6),
+    new THREE.MeshStandardMaterial({ color: 0x0e1622, emissive: cfg.color, emissiveIntensity: .55, flatShading: true }));
+  body.position.y = 1.15; g.add(body);
+  const head = new THREE.Mesh(new THREE.OctahedronGeometry(.85), new THREE.MeshBasicMaterial({ color: cfg.color }));
+  head.position.y = 3.7; g.add(head);
+  const sel = new THREE.Mesh(new THREE.RingGeometry(2.5, 2.9, 6), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide }));
+  sel.rotation.x = -Math.PI / 2; sel.position.y = .25; sel.visible = false; g.add(sel);
+  const hit = new THREE.Mesh(new THREE.SphereGeometry(3.4, 8, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }));
+  hit.position.y = 2; hit.userData.unit = u; g.add(hit);
+  g.scale.setScalar(1.25);
+  g.position.copy(u.pos);
+  scene.add(g);
+  unitHitboxes.push(hit);
+  // Dashed route line
+  const lineGeo = new THREE.BufferGeometry();
+  lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * 16), 3));
+  const line = new THREE.Line(lineGeo, new THREE.LineDashedMaterial({ color: cfg.color, dashSize: 1.6, gapSize: 1.1, transparent: true, opacity: .85 }));
+  line.frustumCulled = false; line.visible = false; scene.add(line);
+  // Screen label
+  const el = document.createElement('div');
+  el.className = 'ulabel'; el.style.color = cfg.css; el.innerHTML = `<em>${u.callsign}</em>`;
+  labelsEl.appendChild(el);
+  Object.assign(u, { group: g, head, sel, line, lineGeo, el });
+  units.push(u);
+  return u;
+}
+
+(function spawnUnits() {
+  const toward = (p, k = 0.96) => [p[0] * k, p[1] * k];
+  gates.forEach(g => makeUnit('steward', toward(g.inner)));
+  makeUnit('steward', kiosks[1].ringPt);
+  makeUnit('steward', kiosks[5].ringPt);
+  makeUnit('medic', firstAid[0].post);
+  makeUnit('medic', firstAid[1].post);
+  makeUnit('medic', firstAid[2].post);
+  makeUnit('security', gates[1].pos);
+  makeUnit('security', gates[3].pos);
+  makeUnit('security', [-45, -RZ]);
+  makeUnit('security', [45, RZ]);
+})();
+
+function disengage(u) { u.incident = null; if (u.state === 'resolving') u.state = 'idle'; }
+
+function orderMove(u, x, z, quiet = false) {
+  x = clamp(x, -125, 125); z = clamp(z, -110, 110);
+  disengage(u);
+  u.path = navPath(u.pos.x, u.pos.z, x, z); u.pi = 0;
+  u.state = 'moving'; u.hinted = null; u.dest = zoneName(x, z);
+  spawnPing(x, heightAt(x, z), z, u.cfg.color);
+  if (!quiet) log(`${u.callsign} dispatched → ${u.dest}`);
+  refreshUnitCard();
+}
+
+function canWork(u, inc) { return !!inc.def.units[u.type]; }
+function checkEngage(u, justArrived) {
+  let best = null, bd = 7.5;
+  for (const inc of S.incidents) {
+    const d = dist2D(u.pos.x, u.pos.z, inc.x, inc.z);
+    if (d < bd) { bd = d; best = inc; }
+  }
+  if (!best) return;
+  if (canWork(u, best)) {
+    u.state = 'resolving'; u.incident = best;
+    log(`${u.callsign} on scene: ${best.def.name} (${best.zone})`);
+  } else if (justArrived && u.hinted !== best.id) {
+    u.hinted = best.id;
+    log(`${u.callsign} can't handle ${best.def.name}. Send ${needsText(best.def)}.`, 'warn');
+  }
+}
+
+function updateUnits(dt) {
+  for (const u of units) {
+    if (u.state === 'moving') {
+      let step = u.cfg.speed * dt * (S.raining ? 0.92 : 1);
+      while (step > 0 && u.pi < u.path.length) {
+        const [tx, tz] = u.path[u.pi];
+        const d = dist2D(u.pos.x, u.pos.z, tx, tz);
+        if (d <= step) { u.pos.x = tx; u.pos.z = tz; step -= d; u.travelled += d; u.pi++; }
+        else { const k = step / d; u.pos.x += (tx - u.pos.x) * k; u.pos.z += (tz - u.pos.z) * k; u.travelled += step; step = 0; }
+      }
+      if (u.pi >= u.path.length) { u.state = 'idle'; checkEngage(u, true); refreshUnitCard(); }
+    } else if (u.state === 'idle') {
+      checkEngage(u, false);
+    }
+  }
+}
+
+function renderUnits(dtReal, now) {
+  for (const u of units) {
+    const targetY = heightAt(u.pos.x, u.pos.z);
+    u.pos.y = lerp(u.pos.y, targetY, Math.min(1, dtReal * 8));
+    u.group.position.copy(u.pos);
+    u.head.rotation.y += dtReal * (u.state === 'resolving' ? 5 : 1.4);
+    u.head.position.y = 3.7 + Math.sin(now * 0.003 + u.id) * 0.25;
+    u.sel.visible = S.selected === u;
+    if (u.sel.visible) { u.sel.rotation.z += dtReal * 1.5; u.sel.scale.setScalar(1 + Math.sin(now * 0.006) * 0.08); }
+    // Route line
+    if (u.state === 'moving') {
+      const arr = u.lineGeo.attributes.position.array;
+      let n = 0;
+      arr[n++] = u.pos.x; arr[n++] = u.pos.y + .4; arr[n++] = u.pos.z;
+      for (let i = u.pi; i < u.path.length && n < arr.length; i++) {
+        const [x, z] = u.path[i]; arr[n++] = x; arr[n++] = heightAt(x, z) + .4; arr[n++] = z;
+      }
+      u.lineGeo.setDrawRange(0, n / 3);
+      u.lineGeo.attributes.position.needsUpdate = true;
+      u.line.computeLineDistances();
+      u.line.visible = true;
+    } else u.line.visible = false;
+  }
+}
+
+// Expanding ring "ping" at move destinations
+const pings = [];
+function spawnPing(x, y, z, color) {
+  const m = new THREE.Mesh(new THREE.RingGeometry(.8, 1.2, 32), new THREE.MeshBasicMaterial({ color, transparent: true, side: THREE.DoubleSide, depthWrite: false }));
+  m.rotation.x = -Math.PI / 2; m.position.set(x, y + .3, z);
+  scene.add(m); pings.push({ m, t: 0 });
+}
+function updatePings(dtReal) {
+  for (let i = pings.length - 1; i >= 0; i--) {
+    const p = pings[i]; p.t += dtReal;
+    p.m.scale.setScalar(1 + p.t * 6); p.m.material.opacity = Math.max(0, 1 - p.t / 0.8);
+    if (p.t > 0.8) { scene.remove(p.m); p.m.geometry.dispose(); p.m.material.dispose(); pings.splice(i, 1); }
+  }
+}
+
+/* =====================================================================
+   11. INCIDENTS
+   ===================================================================== */
+const COL_LOW = new THREE.Color(0xffbe3b), COL_HIGH = new THREE.Color(0xff3344);
+const markerGeo = {
+  beam: new THREE.CylinderGeometry(.45, .45, 22, 8, 1, true),
+  ring: new THREE.RingGeometry(2.2, 2.8, 32),
+  disc: new THREE.CircleGeometry(2.2, 32),
+};
+markerGeo.beam.translate(0, 11, 0);
+const needsText = def => Object.entries(def.units).sort((a, b) => b[1] - a[1]).map(([t]) => UNIT_TYPES[t].label).join(' / ');
+
+function spawnIncident(type, x, z, ref = null) {
+  if (S.incidents.length >= CFG.MAX_OPEN_INCIDENTS) return null;
+  const def = INC[type];
+  const y = heightAt(x, z);
+  const inc = { id: ++S.incSeq, type, def, x, y, z, ref, sev: def.start, progress: 0, created: S.t, criticalSince: null, zone: zoneName(x, z), workers: 0 };
+  const mat = new THREE.MeshBasicMaterial({ color: COL_LOW.clone(), transparent: true, opacity: .3, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const ringMat = new THREE.MeshBasicMaterial({ color: COL_LOW.clone(), transparent: true, opacity: .9, side: THREE.DoubleSide, depthWrite: false });
+  const g = new THREE.Group();
+  const beam = new THREE.Mesh(markerGeo.beam, mat); g.add(beam);
+  const ring = new THREE.Mesh(markerGeo.ring, ringMat); ring.rotation.x = -Math.PI / 2; ring.position.y = .3; g.add(ring);
+  const disc = new THREE.Mesh(markerGeo.disc, mat); disc.rotation.x = -Math.PI / 2; disc.position.y = .25; g.add(disc);
+  g.position.set(x, y, z); scene.add(g);
+  inc.marker = g; inc.mats = [mat, ringMat]; inc.ringMesh = ring;
+  const el = document.createElement('div');
+  el.className = 'ilabel';
+  el.innerHTML = `<div class="t"><span class="code">${def.code}</span>${def.name}</div>
+    <div class="z">${inc.zone}</div><div class="sev"><i></i></div><div class="need">NEEDS ${needsText(def).toUpperCase()}</div>`;
+  el.addEventListener('pointerdown', e => { e.stopPropagation(); onIncidentClick(inc); });
+  labelsEl.appendChild(el);
+  inc.el = el; inc.sevEl = el.querySelector('.sev i');
+  S.incidents.push(inc); S.totalIncidents++;
+  log(`${def.name} reported, ${inc.zone}`, 'warn');
+  return inc;
+}
+function removeIncident(inc) {
+  scene.remove(inc.marker); inc.mats.forEach(m => m.dispose());
+  inc.el.remove();
+  S.incidents = S.incidents.filter(i => i !== inc);
+  for (const u of units) if (u.incident === inc) { u.incident = null; u.state = 'idle'; }
+}
+function resolveIncident(inc) {
+  const crew = units.filter(u => u.incident === inc);
+  crew.forEach(u => u.tasks++);
+  S.resolved++;
+  log(`Resolved: ${inc.def.name} (${inc.zone}) by ${crew.map(u => u.callsign).join(', ')}`, 'good');
+  removeIncident(inc);
+  refreshUnitCard();
+}
+function failIncident(inc) {
+  S.failed++; S.safetyDebt += 15;
+  log(`FAILURE: ${inc.def.name} at ${inc.zone} went unanswered. Logged for review.`, 'crit');
+  removeIncident(inc);
+}
+function onIncidentClick(inc) {
+  if (S.selected) {
+    orderMove(S.selected, inc.x + rand(-1.8, 1.8), inc.z + rand(-1.8, 1.8));
+    if (!canWork(S.selected, inc)) log(`Warning: ${S.selected.callsign} can't handle ${inc.def.name}. Needs ${needsText(inc.def)}.`, 'warn');
+  } else {
+    flyTo(new THREE.Vector3(inc.x + 25, inc.y + 40, inc.z + 35), new THREE.Vector3(inc.x, inc.y, inc.z));
+  }
+}
+
+function updateIncidents(dt) {
+  for (const inc of [...S.incidents]) {
+    const crew = units.filter(u => u.state === 'resolving' && u.incident === inc);
+    inc.workers = crew.length;
+    if (crew.length) {
+      inc.progress += crew.reduce((s, u) => s + (inc.def.units[u.type] || 0), 0) / RESOLVE_TIME * dt;
+      inc.sev = Math.max(0, inc.sev - dt * 3);
+      if (inc.progress >= 1) resolveIncident(inc);
+    } else {
+      inc.sev = Math.min(100, inc.sev + inc.def.growth * dt);
+      if (inc.sev >= 100 && inc.criticalSince === null) {
+        inc.criticalSince = S.t;
+        log(`CRITICAL: ${inc.def.name} at ${inc.zone} needs ${needsText(inc.def)} now`, 'crit');
+      }
+      if (inc.criticalSince !== null && S.t - inc.criticalSince > CFG.CRITICAL_FAIL_AFTER) failIncident(inc);
+    }
+  }
+}
+
+function renderIncidents(now) {
+  for (const inc of S.incidents) {
+    const t = inc.sev / 100;
+    const c = inc.workers ? new THREE.Color(0x7dff6a) : COL_LOW.clone().lerp(COL_HIGH, t);
+    inc.mats.forEach(m => m.color.copy(c));
+    const pulse = 1 + 0.25 * Math.sin(now * (0.004 + t * 0.01));
+    inc.ringMesh.scale.setScalar(pulse * (1 + t * 0.5));
+    inc.mats[0].opacity = 0.18 + 0.2 * t + (inc.criticalSince !== null ? 0.15 * Math.sin(now * 0.015) : 0);
+    inc.sevEl.style.width = (inc.workers ? inc.progress * 100 : inc.sev) + '%';
+    inc.el.classList.toggle('crit', inc.criticalSince !== null && !inc.workers);
+    inc.el.classList.toggle('work', inc.workers > 0);
+    placeLabel(inc.el, inc.x, inc.y + 9, inc.z);
+  }
+}
+
+// ---------- 11a. Random & emergent incident generation ----------
+function randomRingPos(spread = 3) { const p = ringPoint(Math.random() * RING_P); return [p[0] + rand(-spread, spread), p[1] + rand(-spread, spread)]; }
+
+function spawnRandomIncident() {
+  const ph = S.phase;
+  const busiestKiosk = kiosks.reduce((a, b) => a.queue.length >= b.queue.length ? a : b);
+  const type = weightedPick([
+    ['medical', 3 * (S.raining ? 1.8 : 1)],
+    ['surge', ph === 'PRE' || ph === 'FT' ? 2 : 0.7],
+    ['kiosk', busiestKiosk.queue.length > 6 ? 2 : 0],
+    ['lostchild', 1.4],
+    ['weather', !S.raining && S.weatherEvents < 2 && S.t > 15 && S.t < 170 ? 0.7 : 0],
+  ]);
+  switch (type) {
+    case 'medical': {
+      const seated = agents.filter(a => a.state === 'seated');
+      if (seated.length && Math.random() < 0.7) { const a = pick(seated); spawnIncident('medical', a.x, a.z); }
+      else { const [x, z] = randomRingPos(); spawnIncident('medical', x, z); }
+      break;
+    }
+    case 'surge': {
+      if (ph === 'PRE' || ph === 'FT') {
+        const g = ph === 'PRE' ? gates.reduce((a, b) => a.queue.length >= b.queue.length ? a : b) : pick(gates);
+        if (!hasOpenIncident('surge', g)) spawnIncident('surge', g.pos[0] + g.out[0] * 4, g.pos[1] + g.out[1] * 4, g);
+      } else { const [x, z] = randomRingPos(2); spawnIncident('surge', x, z); }
+      break;
+    }
+    case 'kiosk':
+      if (!hasOpenIncident('kiosk', busiestKiosk)) spawnIncident('kiosk', busiestKiosk.pos[0] + busiestKiosk.n[0] * 3, busiestKiosk.pos[1] + busiestKiosk.n[1] * 3, busiestKiosk);
+      break;
+    case 'lostchild': { const [x, z] = randomRingPos(); spawnIncident('lostchild', x, z); break; }
+    case 'weather': startRain(); break;
+  }
+}
+
+function updateIncidentGeneration(dt) {
+  const rate = { PRE: 0.075, H1: 0.05, HT: 0.11, H2: 0.05, FT: 0.07 }[S.phase];
+  if (S.phase === 'FT' && S.t > CFG.T_FULLTIME + 22) return;
+  if (Math.random() < rate * dt) spawnRandomIncident();
+  // Emergent incidents from simulation pressure
+  for (const g of gates) if (g.qTime > 9 && !hasOpenIncident('surge', g) && Math.random() < 0.2 * dt)
+    spawnIncident('surge', g.pos[0] + g.out[0] * 4, g.pos[1] + g.out[1] * 4, g);
+  for (const k of kiosks) if (k.queue.length > 22 && !hasOpenIncident('kiosk', k) && Math.random() < 0.25 * dt)
+    spawnIncident('kiosk', k.pos[0] + k.n[0] * 3, k.pos[1] + k.n[1] * 3, k);
+  if (S.raining && S.t >= S.rainUntil) endRain();
+}
+
+/* =====================================================================
+   12. WEATHER (rain particles + hazard)
+   ===================================================================== */
+const RAIN_N = 4000;
+const rainGeo = new THREE.BufferGeometry();
+const rainPos = new Float32Array(RAIN_N * 3);
+for (let i = 0; i < RAIN_N; i++) { rainPos[i * 3] = rand(-140, 140); rainPos[i * 3 + 1] = rand(0, 130); rainPos[i * 3 + 2] = rand(-115, 115); }
+rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+const rain = new THREE.Points(rainGeo, new THREE.PointsMaterial({ color: 0x9fd8ff, size: .55, transparent: true, opacity: .55, depthWrite: false }));
+rain.visible = false; scene.add(rain);
+
+function startRain() {
+  S.raining = true; S.weatherEvents++;
+  S.rainUntil = S.t + rand(18, 30);
+  rain.visible = true;
+  log('Weather change: heavy rain moving in. Concourses getting slippery.', 'warn');
+  banner('WEATHER ALERT', 'HEAVY RAIN', '#5b8cff');
+  const [x, z] = randomRingPos(2);
+  spawnIncident('weather', x, z);
+}
+function endRain() { S.raining = false; rain.visible = false; log('Rain clearing. Conditions back to normal.'); }
+function updateRain(dtReal) {
+  if (!rain.visible) return;
+  const k = S.paused ? 0.15 : 1;
+  for (let i = 1; i < rainPos.length; i += 3) { rainPos[i] -= 95 * dtReal * k; if (rainPos[i] < 0) rainPos[i] += 130; }
+  rainGeo.attributes.position.needsUpdate = true;
+}
+
+/* =====================================================================
+   13. ON-PITCH MATCH (players, ball, goals)
+   ===================================================================== */
+const FORMATION = [[-48, 0], [-36, -24], [-37, -8], [-37, 8], [-36, 24], [-20, -24], [-21, -8], [-21, 8], [-20, 24], [-7, -8], [-7, 8]];
+const players = [];
+const ball = new THREE.Mesh(new THREE.SphereGeometry(.55, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+ball.position.set(0, .55, 0); ball.visible = false; scene.add(ball);
+let ballTarget = [0, 0];
+(function buildPlayers() {
+  const geo = new THREE.CylinderGeometry(.55, .55, 2.1, 6); geo.translate(0, 1.05, 0);
+  for (const team of ['home', 'away']) {
+    const mat = new THREE.MeshBasicMaterial({ color: team === 'home' ? CFG.HOME.color : CFG.AWAY.color });
+    FORMATION.forEach(([fx, fz]) => {
+      const base = [team === 'home' ? fx : -fx, fz];
+      const m = new THREE.Mesh(geo, mat);
+      m.position.set(base[0], 0, base[1]); m.visible = false; scene.add(m);
+      players.push({ m, team, base, spd: rand(16, 22) });
+    });
+  }
+})();
+function updateMatch(dt) {
+  const live = S.phase === 'H1' || S.phase === 'H2';
+  ball.visible = live; players.forEach(p => p.m.visible = live);
+  if (!live) { ball.position.set(0, .55, 0); players.forEach(p => p.m.position.set(p.base[0], 0, p.base[1])); return; }
+  // Ball drifts between random targets
+  const bx = ball.position.x, bz = ball.position.z;
+  if (dist2D(bx, bz, ballTarget[0], ballTarget[1]) < 1) ballTarget = [rand(-48, 48), rand(-30, 30)];
+  const bd = dist2D(bx, bz, ballTarget[0], ballTarget[1]), bs = Math.min(bd, 42 * dt);
+  ball.position.x += (ballTarget[0] - bx) / bd * bs; ball.position.z += (ballTarget[1] - bz) / bd * bs;
+  // Each team's nearest player chases, others hold shape shifted toward the ball
+  for (const team of ['home', 'away']) {
+    const squad = players.filter(p => p.team === team);
+    let chaser = null, cd = 1e9;
+    for (const p of squad) { const d = dist2D(p.m.position.x, p.m.position.z, ball.position.x, ball.position.z); if (d < cd) { cd = d; chaser = p; } }
+    for (const p of squad) {
+      const tx = p === chaser ? ball.position.x : clamp(p.base[0] + ball.position.x * 0.45, -51, 51);
+      const tz = p === chaser ? ball.position.z : clamp(p.base[1] + ball.position.z * 0.35, -33, 33);
+      const d = dist2D(p.m.position.x, p.m.position.z, tx, tz);
+      if (d > 0.1) { const s = Math.min(d, p.spd * dt); p.m.position.x += (tx - p.m.position.x) / d * s; p.m.position.z += (tz - p.m.position.z) / d * s; }
+    }
+  }
+  // Goals
+  const rH = 0.026, rA = 0.02;
+  if (Math.random() < rH * dt) scoreGoal('home');
+  else if (Math.random() < rA * dt) scoreGoal('away');
+}
+function scoreGoal(team) {
+  S.score[team]++;
+  const t = team === 'home' ? CFG.HOME : CFG.AWAY;
+  const min = Math.floor(matchMinute());
+  log(`GOAL ${min}', ${t.name}! ${CFG.HOME.short} ${S.score.home}–${S.score.away} ${CFG.AWAY.short}`, 'goal');
+  banner('GOAL!', `${t.name.toUpperCase()} · ${S.score.home}–${S.score.away}`, team === 'home' ? '#2ef2ff' : '#ff3d9a');
+  S.celebrate = { team, until: performance.now() + 4500 };
+}
+function matchMinute() {
+  if (S.t < CFG.T_KICKOFF) return 0;
+  if (S.t < CFG.T_HALFTIME) return S.t - CFG.T_KICKOFF;
+  if (S.t < CFG.T_SECOND_HALF) return 45;
+  if (S.t < CFG.T_FULLTIME) return 45 + S.t - CFG.T_SECOND_HALF;
+  return 90;
+}
+
+/* =====================================================================
+   14. PHASES (kick-off, half-time surge, full-time egress)
+   ===================================================================== */
+function onPhaseChange(prev, next) {
+  if (next === 'H1') {
+    log(`Kick-off: ${CFG.HOME.name} v ${CFG.AWAY.name}`, 'goal');
+    banner('KICK-OFF', `${CFG.HOME.short} v ${CFG.AWAY.short}`);
+  } else if (next === 'HT') {
+    log(`Half-time ${S.score.home}–${S.score.away}. Expect a rush on concourses and kiosks.`, 'warn');
+    banner('HALF-TIME', 'CONCOURSE SURGE EXPECTED', '#ffbe3b');
+    for (const a of agents) if (a.state === 'seated') {
+      const r = Math.random();
+      if (r < 0.32) { a.tripKind = 'kiosk'; a.tripAt = S.t + rand(0, 5); }
+      else if (r < 0.5) { a.tripKind = 'concourse'; a.tripAt = S.t + rand(0, 6); }
+    }
+  } else if (next === 'H2') {
+    log('Second half under way');
+    banner('SECOND HALF', `${S.score.home}–${S.score.away}`);
+  } else if (next === 'FT') {
+    log(`Full time: ${CFG.HOME.short} ${S.score.home}–${S.score.away} ${CFG.AWAY.short}. Egress starting.`, 'goal');
+    banner('FULL TIME', `${S.score.home}–${S.score.away} · EGRESS`, '#7dff6a');
+    for (const a of agents) {
+      if (a.state === 'pending') a.state = 'gone';
+      else if (a.state !== 'gone') a.exitAt = S.t + rand(0, 14);
+    }
+  }
+}
+
+/* =====================================================================
+   15. HEATMAP (crowd density overlay)
+   ===================================================================== */
+const HM = { W: 96, H: 80, x0: -120, z0: -100, cell: 2.5 };
+HM.canvas = document.createElement('canvas'); HM.canvas.width = HM.W; HM.canvas.height = HM.H;
+HM.ctx = HM.canvas.getContext('2d');
+HM.img = HM.ctx.createImageData(HM.W, HM.H);
+HM.grid = new Float32Array(HM.W * HM.H); HM.raw = new Float32Array(HM.W * HM.H); HM.tmp = new Float32Array(HM.W * HM.H);
+HM.tex = new THREE.CanvasTexture(HM.canvas);
+HM.tex.colorSpace = THREE.SRGBColorSpace;
+HM.mesh = new THREE.Mesh(new THREE.PlaneGeometry(HM.W * HM.cell, HM.H * HM.cell),
+  new THREE.MeshBasicMaterial({ map: HM.tex, transparent: true, depthTest: false, depthWrite: false }));
+HM.mesh.rotation.x = -Math.PI / 2; HM.mesh.position.y = 4; HM.mesh.renderOrder = 999; HM.mesh.visible = false;
+scene.add(HM.mesh);
+const HEAT_STOPS = [[0, [20, 40, 255]], [.3, [0, 240, 255]], [.6, [255, 230, 0]], [1, [255, 40, 60]]];
+function heatColor(v) {
+  for (let i = 1; i < HEAT_STOPS.length; i++) {
+    const [p1, c1] = HEAT_STOPS[i], [p0, c0] = HEAT_STOPS[i - 1];
+    if (v <= p1) { const t = (v - p0) / (p1 - p0); return [lerp(c0[0], c1[0], t), lerp(c0[1], c1[1], t), lerp(c0[2], c1[2], t)]; }
+  }
+  return HEAT_STOPS[HEAT_STOPS.length - 1][1];
+}
+function blurPass(src, dst, dx, dy) {
+  const { W, H } = HM;
+  for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
+    let s = src[j * W + i] * 2, n = 2;
+    for (const k of [-1, 1]) { const ii = i + dx * k, jj = j + dy * k; if (ii >= 0 && ii < W && jj >= 0 && jj < H) { s += src[jj * W + ii]; n++; } }
+    dst[j * W + i] = s / n;
+  }
+}
+function updateHeatmap() {
+  const { W, H, grid, raw, tmp } = HM;
+  grid.fill(0); raw.fill(0);
+  for (const a of agents) {
+    if (a.state === 'pending' || a.state === 'gone') continue;
+    const i = Math.floor((a.x - HM.x0) / HM.cell), j = Math.floor((a.z - HM.z0) / HM.cell);
+    if (i < 0 || i >= W || j < 0 || j >= H) continue;
+    const seated = a.state === 'seated';
+    grid[j * W + i] += seated ? 0.35 : 1;
+    if (!seated) raw[j * W + i] += 1;
+  }
+  let max = 0; for (let k = 0; k < raw.length; k++) if (raw[k] > max) max = raw[k];
+  S.maxDensity = max;
+  if (!S.heatmap) return;
+  blurPass(grid, tmp, 1, 0); blurPass(tmp, grid, 0, 1);
+  blurPass(grid, tmp, 1, 0); blurPass(tmp, grid, 0, 1);
+  const d = HM.img.data;
+  for (let k = 0; k < grid.length; k++) {
+    const v = clamp(grid[k] / 3.2, 0, 1);
+    const [r, g, b] = heatColor(v);
+    d[k * 4] = r; d[k * 4 + 1] = g; d[k * 4 + 2] = b; d[k * 4 + 3] = v < 0.03 ? 0 : Math.min(225, 60 + v * 200);
+  }
+  HM.ctx.putImageData(HM.img, 0, 0);
+  HM.tex.needsUpdate = true;
+}
+
+/* =====================================================================
+   16. SAFETY RATING
+   ===================================================================== */
+const avgGateQueue = () => gates.reduce((s, g) => s + g.qTime, 0) / gates.length;
+function updateSafety(dt) {
+  let pen = 0;
+  for (const inc of S.incidents) pen += inc.def.weight * (0.35 + 0.65 * inc.sev / 100) * (inc.criticalSince !== null ? 1.6 : 1) * (inc.workers ? 0.5 : 1);
+  pen += Math.max(0, avgGateQueue() - 5) * 1.5;
+  pen += Math.min(12, Math.max(0, S.maxDensity - 7) * 1.5);
+  pen += S.safetyDebt;
+  if (S.raining) pen += 3;
+  S.safetyDebt = Math.max(0, S.safetyDebt - dt * 0.6);
+  const target = clamp(100 - pen, 0, 100);
+  S.safety += (target - S.safety) * Math.min(1, dt * 0.8);
+  if (Math.floor(S.t) !== S.lastSample) {
+    S.lastSample = Math.floor(S.t);
+    S.safetyHist.push(S.safety); S.safetySum += S.safety; S.safetySamples++;
+    S.safetyMin = Math.min(S.safetyMin, S.safety);
+  }
+}
+function safetyGrade(v) {
+  if (v >= 85) return ['SECURE', '#7dff6a'];
+  if (v >= 65) return ['ELEVATED', '#ffbe3b'];
+  if (v >= 40) return ['HIGH RISK', '#ff8a3d'];
+  return ['CRITICAL', '#ff4d5e'];
+}
+
+/* =====================================================================
+   17. MAIN SIMULATION STEP
+   ===================================================================== */
+function simulate(dt) {
+  S.t += dt;
+  const ph = getPhase(S.t);
+  if (ph !== S.phase) { const prev = S.phase; S.phase = ph; onPhaseChange(prev, ph); }
+  updateAgents(dt);
+  updateGates(dt);
+  updateKiosks(dt);
+  updateUnits(dt);
+  updateIncidents(dt);
+  updateIncidentGeneration(dt);
+  updateMatch(dt);
+  updateSafety(dt);
+  // End condition: stadium empty after full time, or hard stop
+  if (S.phase === 'FT' && S.t > CFG.T_FULLTIME + 5) {
+    const active = agents.some(a => a.state !== 'gone');
+    if (!active || S.t >= CFG.T_END) endGame();
+  }
+}
+
+/* =====================================================================
+   18. CAMERA PRESETS & TWEENING
+   ===================================================================== */
+const CAMS = {
+  overview: [[20, 200, 185], [20, 0, 10]], // offset right so the stadium sits clear of the side panel
+  pitch:    [[0, 2.2, 37], [0, 5, -30]],
+  N: [[0, 32, 18], [0, 5, -52]],
+  S: [[0, 32, -18], [0, 5, 52]],
+  W: [[22, 32, 0], [-70, 5, 0]],
+  E: [[-22, 32, 0], [70, 5, 0]],
+};
+const tween = { active: false };
+function flyTo(pos, target, dur = 1.3) {
+  Object.assign(tween, { active: true, t: 0, dur, p0: camera.position.clone(), p1: pos.clone(), t0: controls.target.clone(), t1: target.clone() });
+}
+function setCam(name) {
+  document.querySelectorAll('#cams .btn').forEach(b => b.classList.toggle('on', b.dataset.cam === name));
+  if (name === 'free') return;
+  const [p, t] = CAMS[name];
+  flyTo(new THREE.Vector3(...p), new THREE.Vector3(...t));
+}
+controls.addEventListener('start', () => { tween.active = false; });
+function updateTween(dtReal) {
+  if (!tween.active) return;
+  tween.t = Math.min(1, tween.t + dtReal / tween.dur);
+  const e = easeInOut(tween.t);
+  camera.position.lerpVectors(tween.p0, tween.p1, e);
+  controls.target.lerpVectors(tween.t0, tween.t1, e);
+  if (tween.t >= 1) tween.active = false;
+}
+function focusUnit(u) {
+  flyTo(new THREE.Vector3(u.pos.x + 20, u.pos.y + 45, u.pos.z + 40), u.pos.clone());
+  document.querySelectorAll('#cams .btn').forEach(b => b.classList.toggle('on', b.dataset.cam === 'free'));
+}
+
+/* =====================================================================
+   19. INPUT — selection & orders (RTS style)
+   ===================================================================== */
+const raycaster = new THREE.Raycaster(), ndc = new THREE.Vector2();
+let downInfo = null;
+function setRay(e) { ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); raycaster.setFromCamera(ndc, camera); }
+
+renderer.domElement.addEventListener('pointerdown', e => { downInfo = { x: e.clientX, y: e.clientY, b: e.button }; });
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downInfo) return;
+  const moved = Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y), b = downInfo.b;
+  downInfo = null;
+  if (moved < 6) handleClick(e, b);
+});
+renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+
+let hoverQueued = false;
+renderer.domElement.addEventListener('pointermove', e => {
+  if (hoverQueued || e.buttons) return;
+  hoverQueued = true;
+  requestAnimationFrame(() => {
+    hoverQueued = false; setRay(e);
+    const over = raycaster.intersectObjects(unitHitboxes, false).length > 0;
+    renderer.domElement.style.cursor = over ? 'pointer' : (S.selected ? 'crosshair' : 'default');
+  });
+});
+
+function handleClick(e, button) {
+  if (!S.started || S.ended) return;
+  setRay(e);
+  const uh = raycaster.intersectObjects(unitHitboxes, false);
+  if (uh.length && button === 0) { const u = uh[0].object.userData.unit; selectUnit(S.selected === u ? null : u); return; }
+  if (!S.selected) return;
+  const gh = raycaster.intersectObjects(groundTargets, false);
+  if (gh.length) orderMove(S.selected, gh[0].point.x, gh[0].point.z);
+}
+
+function selectUnit(u) {
+  S.selected = u;
+  units.forEach(x => { x.rowEl?.classList.toggle('sel', x === u); x.el.classList.toggle('sel', x === u); });
+  refreshUnitCard();
+}
+
+addEventListener('keydown', e => {
+  if (!S.started) return;
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); togglePause(); }
+  else if (k === 'z') setSpeed(1);
+  else if (k === 'x') setSpeed(2);
+  else if (k === 'c') setSpeed(4);
+  else if (k === 'h') toggleHeat();
+  else if (k === 'escape') selectUnit(null);
+  else if (k === 'tab') { e.preventDefault(); const i = S.selected ? (S.selected.id + 1) % units.length : 0; selectUnit(units[i]); }
+  else if ('123456'.includes(k) && k) setCam(['overview', 'pitch', 'N', 'S', 'W', 'E'][+k - 1]);
+});
+
+/* =====================================================================
+   20. HUD
+   ===================================================================== */
+function togglePause() { S.paused = !S.paused; $('pauseBtn').textContent = S.paused ? '▶' : '❚❚'; $('pauseBtn').classList.toggle('on', S.paused); }
+function setSpeed(v) { S.speed = v; if (S.paused) togglePause(); document.querySelectorAll('.spd').forEach(b => b.classList.toggle('on', +b.dataset.speed === v)); }
+function toggleHeat() { S.heatmap = !S.heatmap; HM.mesh.visible = S.heatmap; $('heatBtn').classList.toggle('on', S.heatmap); $('heatLegend').classList.toggle('show', S.heatmap); updateHeatmap(); }
+$('pauseBtn').onclick = togglePause;
+$('heatBtn').onclick = toggleHeat;
+document.querySelectorAll('.spd').forEach(b => b.onclick = () => setSpeed(+b.dataset.speed));
+document.querySelectorAll('#cams .btn').forEach(b => b.onclick = () => setCam(b.dataset.cam));
+
+// ---------- Event log ----------
+let logN = 0;
+function log(msg, level = 'info') {
+  const li = document.createElement('li');
+  li.className = level;
+  li.innerHTML = `<time>${wallClock(S.t)}</time><span></span>`;
+  li.querySelector('span').textContent = msg;
+  const list = $('logList');
+  list.prepend(li);
+  while (list.children.length > 120) list.lastChild.remove();
+  $('logCount').textContent = `${++logN} events`;
+}
+
+// ---------- Banner ----------
+let bannerTimer = null;
+function banner(title, sub = '', color = '#2ef2ff') {
+  const b = $('banner');
+  $('bannerT').textContent = title; $('bannerS').textContent = sub;
+  b.style.setProperty('--bc', color);
+  b.classList.add('show');
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => b.classList.remove('show'), 2400);
+}
+
+// ---------- Static HUD structures ----------
+(function buildHudLists() {
+  $('gateBars').innerHTML = gates.map(g => `<div class="bar-row"><span class="lbl">${g.name}</span><div class="bar"><i id="gb${g.id}"></i></div><span class="val num" id="gv${g.id}">0.0m</span></div>`).join('');
+  $('kioskBars').innerHTML = kiosks.map(k => `<div class="bar-row"><span class="lbl">${k.id}</span><div class="bar"><i id="kb${k.id}"></i></div><span class="val num" id="kv${k.id}">0</span></div>`).join('');
+  const roster = $('roster');
+  for (const u of units) {
+    const row = document.createElement('div');
+    row.className = 'unit-row';
+    row.innerHTML = `<i class="dot" style="color:${u.cfg.css}"></i><b>${u.callsign}</b><span></span>`;
+    row.onclick = () => selectUnit(S.selected === u ? null : u);
+    row.ondblclick = () => { selectUnit(u); focusUnit(u); };
+    roster.appendChild(row);
+    u.rowEl = row; u.statusEl = row.querySelector('span');
+  }
+})();
+const loadColor = f => f < 0.4 ? '#7dff6a' : f < 0.7 ? '#ffbe3b' : f < 0.9 ? '#ff8a3d' : '#ff4d5e';
+
+function unitStatus(u) {
+  if (u.state === 'moving') return `En route → ${u.dest}`;
+  if (u.state === 'resolving' && u.incident) return `On scene · ${u.incident.def.code} ${Math.round(u.incident.progress * 100)}%`;
+  return `Standby · ${zoneName(u.pos.x, u.pos.z)}`;
+}
+function refreshUnitCard() {
+  const card = $('unitCard'), u = S.selected;
+  if (!u) { card.className = 'empty'; card.innerHTML = 'Click a unit marker or roster entry to select it, then click a location or an incident to send it.'; return; }
+  card.className = '';
+  card.innerHTML = `
+    <div class="uc-head"><div class="uc-badge" style="color:${u.cfg.css}">${u.cfg.prefix}</div>
+      <div><b style="color:${u.cfg.css}">${u.callsign}</b><small>${u.cfg.label} unit</small></div></div>
+    <dl class="uc-grid">
+      <dt>Status</dt><dd id="ucStatus">${unitStatus(u)}</dd>
+      <dt>Handles</dt><dd>${u.cfg.skills}</dd>
+      <dt>Resolved</dt><dd class="num" id="ucTasks">${u.tasks}</dd>
+      <dt>Distance</dt><dd class="num" id="ucDist">${Math.round(u.travelled)} m</dd>
+    </dl>
+    <div class="uc-actions"><button class="btn" id="ucFocus">FOCUS</button><button class="btn" id="ucHome">RETURN TO POST</button></div>`;
+  $('ucFocus').onclick = () => focusUnit(u);
+  $('ucHome').onclick = () => orderMove(u, u.home[0], u.home[1]);
+}
+
+function drawSpark() {
+  const c = $('spark'), x = c.getContext('2d'), W = c.width, H = c.height, h = S.safetyHist;
+  x.clearRect(0, 0, W, H);
+  x.strokeStyle = 'rgba(46,242,255,.08)'; x.lineWidth = 1;
+  for (const v of [25, 50, 75]) { const y = H - v / 100 * H; x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke(); }
+  if (h.length < 2) return;
+  const n = CFG.T_END, px = i => i / n * W, py = v => H - 4 - v / 100 * (H - 8);
+  const grad = x.createLinearGradient(0, 0, 0, H); grad.addColorStop(0, 'rgba(125,255,106,.25)'); grad.addColorStop(1, 'rgba(125,255,106,0)');
+  x.beginPath(); x.moveTo(px(0), H); h.forEach((v, i) => x.lineTo(px(i), py(v))); x.lineTo(px(h.length - 1), H); x.fillStyle = grad; x.fill();
+  x.beginPath(); h.forEach((v, i) => i ? x.lineTo(px(i), py(v)) : x.moveTo(px(i), py(v)));
+  x.strokeStyle = safetyGrade(h[h.length - 1])[1]; x.lineWidth = 2.5; x.stroke();
+  // Phase markers
+  x.fillStyle = 'rgba(255,255,255,.25)';
+  for (const t of [CFG.T_KICKOFF, CFG.T_HALFTIME, CFG.T_SECOND_HALF, CFG.T_FULLTIME]) x.fillRect(px(t), 0, 1.5, H);
+  $('sparkMin').textContent = `min ${Math.round(S.safetyMin)}`;
+}
+
+function updateHUD() {
+  // Clock
+  const t = S.t;
+  let phase, main;
+  if (t < CFG.T_KICKOFF) { phase = 'GATES OPEN · KICK-OFF IN'; main = mmss(CFG.T_KICKOFF - t); }
+  else if (t < CFG.T_HALFTIME) { phase = '1ST HALF'; main = mmss(t - CFG.T_KICKOFF); }
+  else if (t < CFG.T_SECOND_HALF) { phase = 'HALF-TIME · RESTART IN'; main = mmss(CFG.T_SECOND_HALF - t); }
+  else if (t < CFG.T_FULLTIME) { phase = '2ND HALF'; main = mmss(45 + t - CFG.T_SECOND_HALF); }
+  else { phase = 'FULL TIME · EGRESS'; main = '90:00'; }
+  $('phase').textContent = phase; $('clock').textContent = main; $('wall').textContent = wallClock(t);
+  $('score').textContent = `${S.score.home}–${S.score.away}`;
+  $('attendance').textContent = (S.admitted * CFG.PEOPLE_PER_AGENT).toLocaleString();
+  // Safety
+  const [grade, gc] = safetyGrade(S.safety);
+  $('safetyFill').style.width = S.safety + '%'; $('safetyFill').style.background = gc; $('safetyFill').style.color = gc;
+  $('safetyVal').textContent = Math.round(S.safety); $('safetyVal').style.color = gc;
+  const sg = $('safetyGrade'); sg.textContent = grade; sg.style.color = gc; sg.style.background = gc + '22'; sg.style.border = `1px solid ${gc}66`;
+  $('weather').textContent = S.raining ? '☂ HEAVY RAIN 11°C' : '☀ CLEAR 14°C';
+  $('weather').style.color = S.raining ? '#5b8cff' : '';
+  // KPIs
+  const avgQ = avgGateQueue();
+  $('kGate').textContent = avgQ.toFixed(1) + 'm'; $('kGate').style.color = loadColor(avgQ / 12);
+  $('kGateS').textContent = `peak ${S.peakGateQueue.toFixed(1)}m`;
+  const inQ = kiosks.reduce((s, k) => s + k.queue.length, 0);
+  const load = kiosks.reduce((s, k) => s + Math.min(1, k.queue.length / 25), 0) / kiosks.length;
+  $('kKiosk').textContent = Math.round(load * 100) + '%'; $('kKiosk').style.color = loadColor(load);
+  $('kKioskS').textContent = `${(inQ * CFG.PEOPLE_PER_AGENT).toLocaleString()} in queues`;
+  $('kRev').textContent = fmtMoney(S.revenue);
+  $('kInc').textContent = `${S.incidents.length} / ${S.resolved}`;
+  $('kInc').style.color = S.incidents.some(i => i.criticalSince !== null) ? '#ff4d5e' : S.incidents.length ? '#ffbe3b' : '';
+  $('kIncS').textContent = `open / resolved${S.failed ? ` · ${S.failed} failed` : ''}`;
+  for (const g of gates) {
+    const f = Math.min(1, g.qTime / 15), bar = $('gb' + g.id);
+    bar.style.width = f * 100 + '%'; bar.style.background = loadColor(f);
+    $('gv' + g.id).textContent = `${g.qTime.toFixed(1)}m ${g.boost ? '★' : ''}`;
+  }
+  for (const k of kiosks) {
+    const f = Math.min(1, k.queue.length / 25), bar = $('kb' + k.id);
+    bar.style.width = f * 100 + '%'; bar.style.background = loadColor(f);
+    $('kv' + k.id).textContent = k.queue.length;
+  }
+  // Units
+  let busy = 0;
+  for (const u of units) {
+    if (u.state !== 'idle') busy++;
+    u.statusEl.textContent = unitStatus(u);
+    u.statusEl.classList.toggle('busy', u.state !== 'idle');
+  }
+  $('unitCount').textContent = `${units.length} units · ${busy} active`;
+  if (S.selected && $('ucStatus')) {
+    $('ucStatus').textContent = unitStatus(S.selected);
+    $('ucTasks').textContent = S.selected.tasks;
+    $('ucDist').textContent = Math.round(S.selected.travelled) + ' m';
+  }
+  drawSpark();
+}
+
+// ---------- World-space label projection ----------
+const _lp = new THREE.Vector3();
+function placeLabel(el, x, y, z) {
+  _lp.set(x, y, z).project(camera);
+  if (_lp.z > 1 || Math.abs(_lp.x) > 1.2 || Math.abs(_lp.y) > 1.2) { el.style.visibility = 'hidden'; return; }
+  el.style.visibility = 'visible';
+  el.style.transform = `translate(${(_lp.x * .5 + .5) * innerWidth}px,${(-_lp.y * .5 + .5) * innerHeight}px) translate(-50%,-100%)`;
+}
+function renderUnitLabels() { for (const u of units) placeLabel(u.el, u.pos.x, u.pos.y + 7, u.pos.z); }
+
+/* =====================================================================
+   21. START / END
+   ===================================================================== */
+$('startBtn').onclick = () => {
+  $('intro').classList.add('hidden');
+  S.started = true; S.paused = false;
+  log('Gates open at Aldmere Arena. Stewards to posts.', 'good');
+  banner('GATES OPEN', 'ALDMERE ARENA · 13:30');
+  setCam('overview');
+};
+
+function endGame() {
+  if (S.ended) return;
+  S.ended = true; S.paused = true;
+  const avg = S.safetySum / Math.max(1, S.safetySamples);
+  const grade = avg >= 90 && S.failed === 0 ? 'S' : avg >= 82 ? 'A' : avg >= 70 ? 'B' : avg >= 55 ? 'C' : 'D';
+  const gc = { S: '#2ef2ff', A: '#7dff6a', B: '#ffbe3b', C: '#ff8a3d', D: '#ff4d5e' }[grade];
+  $('sumGrade').textContent = grade; $('sumGrade').style.color = gc;
+  $('sumLine').textContent = `${CFG.HOME.name} ${S.score.home}–${S.score.away} ${CFG.AWAY.name}`;
+  const stat = (k, v) => `<div><span class="cap">${k}</span><b class="num">${v}</b></div>`;
+  $('sumStats').innerHTML = [
+    stat('Attendance', (S.admitted * CFG.PEOPLE_PER_AGENT).toLocaleString()),
+    stat('Revenue', fmtMoney(S.revenue)),
+    stat('Avg safety', Math.round(avg)),
+    stat('Lowest safety', Math.round(S.safetyMin)),
+    stat('Incidents', `${S.resolved}/${S.totalIncidents}`),
+    stat('Failures', S.failed),
+    stat('Peak gate wait', S.peakGateQueue.toFixed(1) + 'm'),
+    stat('Kiosk sales', kiosks.reduce((s, k) => s + k.served, 0) * CFG.PEOPLE_PER_AGENT),
+    stat('Weather events', S.weatherEvents),
+  ].join('');
+  log('Stadium clear. Operations closed.', 'good');
+  setTimeout(() => $('summary').classList.remove('hidden'), 1200);
+}
+
+/* =====================================================================
+   22. MAIN LOOP
+   ===================================================================== */
+const clock = new THREE.Clock();
+let hudTimer = 0, heatTimer = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  const dtReal = Math.min(0.1, clock.getDelta());
+  const now = performance.now();
+  if (S.started && !S.paused && !S.ended) {
+    let dt = dtReal * CFG.SIM_MIN_PER_SEC * S.speed;
+    while (dt > 0) { const step = Math.min(dt, 0.05); simulate(step); dt -= step; }
+  }
+  heatTimer += dtReal;
+  if (heatTimer > 0.25) { heatTimer = 0; updateHeatmap(); }
+  hudTimer += dtReal;
+  if (hudTimer > 0.25) { hudTimer = 0; updateHUD(); }
+  // Rain fog
+  scene.fog.near = lerp(scene.fog.near, S.raining ? 140 : 280, dtReal);
+  scene.fog.far = lerp(scene.fog.far, S.raining ? 420 : 680, dtReal);
+
+  updateTween(dtReal);
+  controls.update();
+  updateRain(dtReal);
+  updatePings(dtReal);
+  renderAgents(now);
+  renderUnits(dtReal, now);
+  renderIncidents(now);
+  renderUnitLabels();
+  renderer.render(scene, camera);
+}
+updateHUD();
+animate();
+</script>
+</body>
+</html>
